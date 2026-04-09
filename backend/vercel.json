@@ -8,7 +8,7 @@
   "redirects": [
     {
       "source": "/api",
-      "destination": "/api/ping",
+      "destination": "/api/docs",
       "permanent": false
     }
   ],

@@ -23,8 +23,6 @@ async function bootstrap() {
       app.setGlobalPrefix('api');
       app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
-      // Swagger disabled for serverless to reduce bundle issues
-      /*
       console.log('--- 🚀 STAGE 4: Initializing Swagger ---');
       const config = new DocumentBuilder()
         .setTitle('Healthcare API')
@@ -33,7 +31,6 @@ async function bootstrap() {
         .build();
       const document = SwaggerModule.createDocument(app, config);
       SwaggerModule.setup('api/docs', app, document);
-      */
 
       console.log('--- 🚀 STAGE 5: Running app.init() with 20s Timeout ---');
       await Promise.race([
