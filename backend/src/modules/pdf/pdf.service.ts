@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import * as puppeteer from 'puppeteer';
 import * as Handlebars from 'handlebars';
 
 @Injectable()
@@ -230,10 +229,28 @@ export class PdfService {
   private async htmlToPdf(html: string): Promise<Buffer> {
     let browser;
     try {
-      browser = await puppeteer.launch({
-        headless: 'new' as any,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-      });
+      // Dynamic imports for Vercel environment
+      const isVercel = process.env.VERCEL || process.env.NODE_ENV === 'production';
+      
+      if (isVercel) {
+        const chromium = require('@sparticuz/chromium');
+        const puppeteer = require('puppeteer-core');
+        
+        browser = await puppeteer.launch({
+          args: chromium.args,
+          defaultViewport: chromium.defaultViewport,
+          executablePath: await chromium.executablePath(),
+          headless: chromium.headless,
+          ignoreHTTPSErrors: true,
+        });
+      } else {
+        const puppeteer = require('puppeteer');
+        browser = await puppeteer.launch({
+          headless: 'new',
+          args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+        });
+      }
+
       const page = await browser.newPage();
       await page.setContent(html, { waitUntil: 'networkidle0' });
       const pdf = await page.pdf({

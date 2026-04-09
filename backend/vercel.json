@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "functions": {
+    "src/vercel.ts": {
+      "memory": 1024,
+      "maxDuration": 60
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "src/vercel.ts"
+    },
+    {
+      "source": "/api",
+      "destination": "src/vercel.ts"
+    }
+  ]
+}
