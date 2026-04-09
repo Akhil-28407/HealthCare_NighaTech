@@ -30,7 +30,15 @@ async function bootstrap() {
         .addBearerAuth()
         .build();
       const document = SwaggerModule.createDocument(app, config);
-      SwaggerModule.setup('api/docs', app, document);
+      
+      // Fix: Use CDN for Swagger assets to avoid 404s on Vercel
+      SwaggerModule.setup('api/docs', app, document, {
+        customCssUrl: 'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.18.3/swagger-ui.min.css',
+        customJs: [
+          'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.18.3/swagger-ui-bundle.js',
+          'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.18.3/swagger-ui-standalone-preset.js',
+        ],
+      });
 
       console.log('--- 🚀 STAGE 5: Running app.init() with 20s Timeout ---');
       await Promise.race([
