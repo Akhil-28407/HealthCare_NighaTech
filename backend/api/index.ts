@@ -67,10 +67,12 @@ export default async (req: any, res: any) => {
     return server(req, res);
   } catch (error) {
     console.error('❌ Request handling failed:', error);
-    res.status(500).json({
-      statusCode: 500,
-      message: 'Internal Server Error during bootstrap',
-      error: error.message,
-    });
+    if (!res.headersSent) {
+      res.status(500).json({
+        statusCode: 500,
+        message: 'Internal Server Error during bootstrap',
+        error: error.message,
+      });
+    }
   }
 };

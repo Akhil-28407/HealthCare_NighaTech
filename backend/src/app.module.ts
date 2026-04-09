@@ -31,6 +31,9 @@ import { SmsModule } from './modules/sms/sms.module';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         uri: configService.get('app.mongodbUri'),
+        serverSelectionTimeoutMS: 5000,
+        socketTimeoutMS: 45000,
+        connectTimeoutMS: 10000,
       }),
     }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
