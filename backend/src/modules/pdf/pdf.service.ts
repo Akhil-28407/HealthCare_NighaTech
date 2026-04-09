@@ -233,16 +233,22 @@ export class PdfService {
       const isVercel = process.env.VERCEL || process.env.NODE_ENV === 'production';
       
       if (isVercel) {
-        const chromium = require('@sparticuz/chromium');
-        const puppeteer = require('puppeteer-core');
-        
-        browser = await puppeteer.launch({
-          args: chromium.args,
-          defaultViewport: chromium.defaultViewport,
-          executablePath: await chromium.executablePath(),
-          headless: chromium.headless,
-          ignoreHTTPSErrors: true,
-        });
+        console.log('📦 Loading serverless Chromium/Puppeteer...');
+        try {
+          const chromium = require('@sparticuz/chromium');
+          const puppeteer = require('puppeteer-core');
+          
+          browser = await puppeteer.launch({
+            args: chromium.args,
+            defaultViewport: chromium.defaultViewport,
+            executablePath: await chromium.executablePath(),
+            headless: chromium.headless,
+            ignoreHTTPSErrors: true,
+          });
+        } catch (e) {
+          console.error('❌ Failed to load serverless Chromium libraries:', e.message);
+          throw new Error('Chromium/Puppeteer initialization failed on Vercel');
+        }
       } else {
         const puppeteer = require('puppeteer');
         browser = await puppeteer.launch({
