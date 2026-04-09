@@ -49,7 +49,7 @@ exports.UsersService = void 0;
 const common_1 = require("@nestjs/common");
 const mongoose_1 = require("@nestjs/mongoose");
 const mongoose_2 = require("mongoose");
-const bcrypt = __importStar(require("bcrypt"));
+const bcrypt = __importStar(require("bcryptjs"));
 const user_schema_1 = require("./schemas/user.schema");
 let UsersService = class UsersService {
     constructor(userModel) {

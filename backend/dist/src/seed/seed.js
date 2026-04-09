@@ -34,7 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose = __importStar(require("mongoose"));
-const bcrypt = __importStar(require("bcrypt"));
+const bcrypt = __importStar(require("bcryptjs"));
 const dotenv_1 = require("dotenv");
 (0, dotenv_1.config)();
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/healthcare';
