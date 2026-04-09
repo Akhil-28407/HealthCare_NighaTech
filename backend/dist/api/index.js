@@ -1,15 +1,18 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const core_1 = require("@nestjs/core");
 const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const app_module_1 = require("../src/app.module");
 const platform_express_1 = require("@nestjs/platform-express");
-const express = require("express");
+const express_1 = __importDefault(require("express"));
 let cachedServer;
 async function bootstrap() {
     if (!cachedServer) {
-        const expressApp = express();
+        const expressApp = (0, express_1.default)();
         const adapter = new platform_express_1.ExpressAdapter(expressApp);
         const app = await core_1.NestFactory.create(app_module_1.AppModule, adapter);
         app.enableCors({
