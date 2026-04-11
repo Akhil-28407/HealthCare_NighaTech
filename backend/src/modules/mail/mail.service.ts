@@ -3,31 +3,20 @@ import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 
 @Injectable()
-export class MailService implements OnModuleInit {
+export class MailService {
   private readonly logger = new Logger(MailService.name);
   private transporter: nodemailer.Transporter;
 
   constructor(private configService: ConfigService) {
-    const user = this.configService.get('app.smtp.user');
-    const pass = this.configService.get('app.smtp.pass');
-    
     this.transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
       port: 465,
       secure: true,
-      auth: { user, pass },
+      auth: {
+        user: this.configService.get('app.smtp.user'),
+        pass: this.configService.get('app.smtp.pass'),
+      },
     });
-  }
-
-  async onModuleInit() {
-    this.logger.log(`🧪 Testing SMTP connection for: ${this.configService.get('app.smtp.user')}...`);
-    try {
-      await this.transporter.verify();
-      this.logger.log('✅ SMTP Connection established successfully!');
-    } catch (error) {
-      this.logger.error(`❌ SMTP Connection failed: ${error.message}`);
-      this.logger.warn('💡 Tip: Ensure you are using a 16-character Google App Password (no spaces).');
-    }
   }
 
   async sendPasswordReset(to: string, name: string, resetUrl: string) {

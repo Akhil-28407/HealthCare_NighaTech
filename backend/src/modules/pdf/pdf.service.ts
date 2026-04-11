@@ -273,7 +273,7 @@ export class PdfService {
   private async htmlToPdf(html: string): Promise<Buffer> {
     let browser;
     try {
-      const isVercel = process.env.VERCEL || process.env.NODE_ENV === 'production';
+      const isVercel = process.env.VERCEL === '1';
       
       if (isVercel) {
         this.logger.log('📦 Launching serverless Chromium (Vercel)...');
@@ -282,7 +282,12 @@ export class PdfService {
           const puppeteer = require('puppeteer-core');
           
           browser = await puppeteer.launch({
-            args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
+            args: [
+              ...chromium.args, 
+              '--no-sandbox', 
+              '--disable-setuid-sandbox',
+              '--disable-features=IsolateOrigins,site-per-process',
+            ],
             defaultViewport: chromium.defaultViewport,
             executablePath: await chromium.executablePath(),
             headless: chromium.headless,
