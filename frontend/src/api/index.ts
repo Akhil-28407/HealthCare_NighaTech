@@ -64,6 +64,7 @@ export const labReportsApi = {
   updateResults: (id: string, results: any[], htmlContent?: string) =>
     api.patch(`/lab-reports/${id}/results`, { results, htmlContent }),
   verify: (id: string) => api.post(`/lab-reports/${id}/verify`),
+  send: (id: string) => api.post(`/lab-reports/${id}/send`),
   downloadPdf: (id: string) =>
     api.get(`/lab-reports/${id}/pdf`, { responseType: 'blob' }),
 };

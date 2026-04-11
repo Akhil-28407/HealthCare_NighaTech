@@ -304,7 +304,7 @@ export class PdfService {
           }
 
           browser = await puppeteer.launch({
-            headless: 'new',
+            headless: true,
             executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || (() => {
               const chromePaths = [
                 '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -315,7 +315,7 @@ export class PdfService {
               const fs = require('fs');
               for (const path of chromePaths) {
                 if (fs.existsSync(path)) {
-                  this.logger.log(`🔍 Using detected browser at: ${path}`);
+                  // Reduced logging for cleaner production output
                   return path;
                 }
               }

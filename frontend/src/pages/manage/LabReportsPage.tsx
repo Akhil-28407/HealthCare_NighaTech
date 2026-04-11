@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { labReportsApi } from '../../api';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { FiEye, FiEdit3, FiCheckCircle, FiDownload } from 'react-icons/fi';
+import { FiEye, FiEdit3, FiCheckCircle, FiDownload, FiMail } from 'react-icons/fi';
 import { useAuthStore } from '../../stores/auth.store';
 import { Role } from '../../types';
 
@@ -29,8 +29,17 @@ export default function LabReportsPage() {
 
   const verifyMutation = useMutation({
     mutationFn: (id: string) => labReportsApi.verify(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['lab-reports'] }); toast.success('Report verified'); },
+    onSuccess: () => { 
+      queryClient.invalidateQueries({ queryKey: ['lab-reports'] }); 
+      toast.success('Report verified and emailed to patient'); 
+    },
     onError: (err: any) => toast.error(err.response?.data?.message || 'Failed'),
+  });
+
+  const sendMutation = useMutation({
+    mutationFn: (id: string) => labReportsApi.send(id),
+    onSuccess: () => toast.success('Report dispatched to patient email'),
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Failed to send email'),
   });
 
   const startEdit = (report: any) => {
@@ -182,6 +191,14 @@ export default function LabReportsPage() {
                       <>
                         <button onClick={() => navigate(`/reports/${report._id}`)} className="text-primary-400 hover:text-primary-300" title="View"><FiEye size={16} /></button>
                         <button onClick={() => downloadPdf(report._id, report.reportNumber)} className="text-green-400 hover:text-green-300" title="Download PDF"><FiDownload size={16} /></button>
+                        <button 
+                          onClick={() => sendMutation.mutate(report._id)} 
+                          className="text-primary-400 hover:text-primary-300" 
+                          disabled={sendMutation.isPending}
+                          title="Send to Patient Email"
+                        >
+                          <FiMail size={16} className={sendMutation.isPending ? 'animate-pulse' : ''} />
+                        </button>
                       </>
                     )}
                   </div>
