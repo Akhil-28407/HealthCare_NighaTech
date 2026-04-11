@@ -2,50 +2,303 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { branchesApi } from '../../api';
 import toast from 'react-hot-toast';
-import { FiPlus } from 'react-icons/fi';
+import { Role } from '../../types';
+import { useAuthStore } from '../../stores/auth.store';
+import { FiPlus, FiEdit2, FiCheck, FiX, FiClock, FiActivity, FiMapPin, FiPhone, FiMail, FiFileText } from 'react-icons/fi';
+
+export enum BranchStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+}
 
 export default function BranchesPage() {
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuthStore();
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ name: '', address: '', city: '', state: '', pincode: '', phone: '', email: '', labName: '', labLicense: '' });
+  const [editingBranch, setEditingBranch] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<BranchStatus | 'ALL'>('ALL');
+  
+  const [form, setForm] = useState({ 
+    name: '', 
+    address: '', 
+    city: '', 
+    state: '', 
+    pincode: '', 
+    phone: '', 
+    email: '', 
+    labName: '', 
+    labLicense: '' 
+  });
 
-  const { data, isLoading } = useQuery({ queryKey: ['branches'], queryFn: () => branchesApi.getAll() });
+  const { data, isLoading } = useQuery({ 
+    queryKey: ['branches'], 
+    queryFn: () => branchesApi.getAll() 
+  });
+
+  const branches = data?.data?.branches || [];
+  const counts = {
+    ALL: branches.length,
+    PENDING: branches.filter((b: any) => b.status === BranchStatus.PENDING).length,
+    APPROVED: branches.filter((b: any) => b.status === BranchStatus.APPROVED).length,
+    REJECTED: branches.filter((b: any) => b.status === BranchStatus.REJECTED).length,
+  };
+
+  const filteredBranches = activeTab === 'ALL' 
+    ? branches 
+    : branches.filter((b: any) => b.status === activeTab);
 
   const createMutation = useMutation({
     mutationFn: (d: any) => branchesApi.create(d),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['branches'] }); toast.success('Branch created'); setShowCreate(false); },
-    onError: (err: any) => toast.error(err.response?.data?.message || 'Failed'),
+    onSuccess: () => { 
+      queryClient.invalidateQueries({ queryKey: ['branches'] }); 
+      const msg = [Role.ADMIN, Role.SUPER_ADMIN].includes(currentUser?.role as Role) 
+        ? 'Branch created successfully' 
+        : 'Lab request submitted for Admin approval';
+      toast.success(msg); 
+      setShowCreate(false); 
+      resetForm();
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Failed to create branch'),
   });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string, data: any }) => branchesApi.update(id, data),
+    onSuccess: () => { 
+      queryClient.invalidateQueries({ queryKey: ['branches'] }); 
+      toast.success('Branch profile updated'); 
+      setEditingBranch(null); 
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Failed to update branch'),
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string, status: BranchStatus }) => branchesApi.updateStatus(id, status),
+    onSuccess: (_, variables) => { 
+      queryClient.invalidateQueries({ queryKey: ['branches'] }); 
+      toast.success(`Lab request ${variables.status.toLowerCase()}`); 
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Failed to update status'),
+  });
+
+  const resetForm = () => {
+    setForm({ name: '', address: '', city: '', state: '', pincode: '', phone: '', email: '', labName: '', labLicense: '' });
+  };
+
+  const startEdit = (branch: any) => {
+    setEditingBranch(branch);
+    setForm({
+      name: branch.name,
+      address: branch.address,
+      city: branch.city,
+      state: branch.state,
+      pincode: branch.pincode,
+      phone: branch.phone,
+      email: branch.email,
+      labName: branch.labName,
+      labLicense: branch.labLicense,
+    });
+  };
+
+  const isLabRole = currentUser?.role === Role.LAB;
+  const isAdminRole = [Role.SUPER_ADMIN, Role.ADMIN].includes(currentUser?.role as Role);
+  const canApprove = isAdminRole;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Branches</h1>
-        <button onClick={() => setShowCreate(!showCreate)} className="btn-primary flex items-center gap-2"><FiPlus /> Add Branch</button>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-white tracking-tight">Branches & Labs</h1>
+          <p className="text-surface-400 mt-1">Manage physical locations and lab registration requests.</p>
+        </div>
+        <button 
+          onClick={() => { setShowCreate(!showCreate); setEditingBranch(null); resetForm(); }} 
+          className="btn-primary flex items-center gap-2 self-start"
+        >
+          <FiPlus /> {isLabRole ? 'Request New Lab' : 'Add New Branch'}
+        </button>
       </div>
-      {showCreate && (
-        <div className="glass-card p-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Object.entries(form).map(([key, val]) => (
-              <div key={key}><label className="label capitalize">{key.replace(/([A-Z])/g, ' $1')}</label>
-                <input value={val} onChange={(e) => setForm({ ...form, [key]: e.target.value })} className="input-field" placeholder={key} /></div>
-            ))}
+
+      {/* Tabs */}
+      <div className="flex border-b border-surface-800">
+        {(['ALL', BranchStatus.APPROVED, BranchStatus.PENDING, BranchStatus.REJECTED] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-6 py-3 text-sm font-medium transition-all relative flex items-center gap-2 ${
+              activeTab === tab ? 'text-primary-400 border-b-2 border-primary-400' : 'text-surface-400 hover:text-white'
+            }`}
+          >
+            {tab.charAt(0) + tab.slice(1).toLowerCase()}
+            <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+              activeTab === tab ? 'bg-primary-500/20 text-primary-400' : 'bg-surface-800 text-surface-500'
+            }`}>
+              {counts[tab]}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {(showCreate || editingBranch) && (
+        <div className="glass-card p-8 space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-white">
+              {editingBranch ? 'Edit Branch Profile' : (isLabRole ? 'Submit Lab Creation Request' : 'Register New Branch')}
+            </h2>
+            <div className="badge badge-primary uppercase tracking-tighter">Information Required</div>
           </div>
-          <div className="flex gap-3">
-            <button onClick={() => createMutation.mutate(form)} className="btn-primary">Create</button>
-            <button onClick={() => setShowCreate(false)} className="btn-secondary">Cancel</button>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="space-y-1">
+              <label className="label">Branch Name</label>
+              <div className="relative">
+                <FiActivity className="absolute left-3 top-3 text-surface-500" />
+                <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field pl-10" placeholder="e.g. Main Laboratory" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="label">Lab Registered Name</label>
+              <div className="relative">
+                <FiFileText className="absolute left-3 top-3 text-surface-500" />
+                <input value={form.labName} onChange={(e) => setForm({ ...form, labName: e.target.value })} className="input-field pl-10" placeholder="Legal Lab Name" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="label">License Number</label>
+              <div className="relative">
+                <FiCheck className="absolute left-3 top-3 text-surface-500" />
+                <input value={form.labLicense} onChange={(e) => setForm({ ...form, labLicense: e.target.value })} className="input-field pl-10" placeholder="Govt. License #" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="label">Primary Phone</label>
+              <div className="relative">
+                <FiPhone className="absolute left-3 top-3 text-surface-500" />
+                <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="input-field pl-10" placeholder="Contact number" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="label">Email Address</label>
+              <div className="relative">
+                <FiMail className="absolute left-3 top-3 text-surface-500" />
+                <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input-field pl-10" placeholder="lab@example.com" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="label">City</label>
+              <div className="relative">
+                <FiMapPin className="absolute left-3 top-3 text-surface-500" />
+                <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="input-field pl-10" placeholder="City" />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="label">Full Address</label>
+            <textarea value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="input-field" rows={2} placeholder="Complete physical address..." />
+          </div>
+
+          <div className="flex gap-4 pt-4 border-t border-surface-800">
+            <button 
+              onClick={() => editingBranch ? updateMutation.mutate({ id: editingBranch._id, data: form }) : createMutation.mutate(form)} 
+              disabled={createMutation.isPending || updateMutation.isPending}
+              className="btn-primary px-8"
+            >
+              {createMutation.isPending || updateMutation.isPending ? 'Processing...' : (editingBranch ? 'Update Profile' : (isLabRole ? 'Submit Request' : 'Create Branch'))}
+            </button>
+            <button onClick={() => { setShowCreate(false); setEditingBranch(null); }} className="btn-secondary px-8">Cancel</button>
           </div>
         </div>
       )}
-      <div className="table-container"><table>
-        <thead><tr><th>Name</th><th>Lab Name</th><th>City</th><th>Phone</th><th>Email</th></tr></thead>
-        <tbody>
-          {isLoading ? Array.from({ length: 3 }).map((_, i) => <tr key={i}><td colSpan={5}><div className="skeleton h-4 w-full" /></td></tr>) :
-          data?.data?.branches?.map((b: any) => (
-            <tr key={b._id}><td className="text-white font-medium">{b.name}</td><td>{b.labName}</td><td>{b.city}</td><td>{b.phone}</td><td>{b.email}</td></tr>
-          ))}
-        </tbody>
-      </table></div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {isLoading ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="glass-card p-6 h-48 skeleton" />
+          ))
+        ) : filteredBranches.length === 0 ? (
+          <div className="col-span-full glass-card p-12 text-center">
+            <FiActivity className="mx-auto text-surface-600 mb-4" size={48} />
+            <p className="text-surface-400">No labs or branches found in this category.</p>
+          </div>
+        ) : (
+          filteredBranches.map((b: any) => {
+            const isOwnBranch = currentUser?.branchId === b._id;
+            const canEdit = isAdminRole || (currentUser?.role === Role.LAB && isOwnBranch);
+
+            return (
+              <div key={b._id} className="glass-card p-6 flex flex-col justify-between group hover:border-primary-500/30 transition-all duration-300">
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold text-white group-hover:text-primary-400 transition-colors">{b.name}</h3>
+                      <p className="text-sm text-surface-400">
+                        {b.labName} {b.requestedBy && <span className="text-xs text-primary-500/70 ml-2">Req by: {b.requestedBy.name}</span>}
+                      </p>
+                    </div>
+                    <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${
+                      b.status === BranchStatus.APPROVED ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
+                      b.status === BranchStatus.PENDING ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                      'bg-red-500/10 text-red-400 border border-red-500/20'
+                    }`}>
+                      {b.status}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 text-sm text-surface-300">
+                    <div className="flex items-center gap-2">
+                      <FiMapPin size={14} className="text-surface-500" />
+                      <span>{b.city}, {b.state}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <FiPhone size={14} className="text-surface-500" />
+                      <span>{b.phone}</span>
+                    </div>
+                    <div className="flex items-center gap-2 italic text-surface-500">
+                      <FiCheck size={14} className="text-surface-600" />
+                      <span>{b.labLicense}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between mt-8 pt-4 border-t border-surface-800">
+                  <div className="flex gap-2">
+                    {canApprove && b.status === BranchStatus.PENDING && (
+                      <>
+                        <button 
+                          onClick={() => statusMutation.mutate({ id: b._id, status: BranchStatus.APPROVED })}
+                          className="p-2 bg-green-500/10 text-green-400 rounded-lg hover:bg-green-500/20 transition-colors"
+                          title="Approve Request"
+                        >
+                          <FiCheck />
+                        </button>
+                        <button 
+                          onClick={() => statusMutation.mutate({ id: b._id, status: BranchStatus.REJECTED })}
+                          className="p-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-colors"
+                          title="Reject Request"
+                        >
+                          <FiX />
+                        </button>
+                      </>
+                    )}
+                    {b.status === BranchStatus.PENDING && (
+                      <div className="flex items-center gap-1 text-[10px] text-amber-400 font-medium">
+                        <FiClock size={12} /> Awaiting Approval
+                      </div>
+                    )}
+                  </div>
+                  
+                  {canEdit && b.status !== BranchStatus.REJECTED && (
+                    <button onClick={() => startEdit(b)} className="text-primary-400 hover:text-primary-300 flex items-center gap-1 text-sm font-medium">
+                      <FiEdit2 size={14} /> Edit Profile
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }

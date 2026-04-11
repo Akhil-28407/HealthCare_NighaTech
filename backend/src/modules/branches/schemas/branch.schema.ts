@@ -1,7 +1,13 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 export type BranchDocument = Branch & Document;
+
+export enum BranchStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+}
 
 @Schema({ timestamps: true })
 export class Branch {
@@ -31,6 +37,12 @@ export class Branch {
 
   @Prop()
   labLicense: string;
+
+  @Prop({ type: String, enum: BranchStatus, default: BranchStatus.APPROVED })
+  status: BranchStatus;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  requestedBy: Types.ObjectId;
 
   @Prop({ default: true })
   isActive: boolean;

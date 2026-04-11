@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Quotation, QuotationSchema } from './schemas/quotation.schema';
 import { Invoice, InvoiceSchema } from '../invoices/schemas/invoice.schema';
 import { Client, ClientSchema } from '../clients/schemas/client.schema';
+import { Branch, BranchSchema } from '../branches/schemas/branch.schema';
 import { QuotationsService } from './quotations.service';
 import { QuotationsController } from './quotations.controller';
 import { CounterModule } from '../counter/counter.module';

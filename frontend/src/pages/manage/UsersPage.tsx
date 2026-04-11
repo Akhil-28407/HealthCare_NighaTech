@@ -5,16 +5,36 @@ import toast from 'react-hot-toast';
 import { FiPlus, FiTrash2 } from 'react-icons/fi';
 import { Role } from '../../types';
 
+import { useAuthStore } from '../../stores/auth.store';
+
 export default function UsersPage() {
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuthStore();
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', password: '', mobile: '', role: Role.EMPLOYEE });
+  const [form, setForm] = useState({ 
+    name: '', 
+    email: '', 
+    password: '', 
+    mobile: '', 
+    role: currentUser?.role === Role.LAB ? Role.LAB_EMP : Role.EMPLOYEE 
+  });
 
   const { data, isLoading } = useQuery({ queryKey: ['users'], queryFn: () => usersApi.getAll() });
 
   const createMutation = useMutation({
     mutationFn: (d: any) => usersApi.create(d),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['users'] }); toast.success('User created'); setShowCreate(false); setForm({ name: '', email: '', password: '', mobile: '', role: Role.EMPLOYEE }); },
+    onSuccess: () => { 
+      queryClient.invalidateQueries({ queryKey: ['users'] }); 
+      toast.success('User created'); 
+      setShowCreate(false); 
+      setForm({ 
+        name: '', 
+        email: '', 
+        password: '', 
+        mobile: '', 
+        role: currentUser?.role === Role.LAB ? Role.LAB_EMP : Role.EMPLOYEE 
+      }); 
+    },
     onError: (err: any) => toast.error(err.response?.data?.message || 'Failed'),
   });
 
@@ -23,11 +43,26 @@ export default function UsersPage() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['users'] }); toast.success('User deactivated'); },
   });
 
+  const getAvailableRoles = () => {
+    if (currentUser?.role === Role.SUPER_ADMIN) return Object.values(Role);
+    if (currentUser?.role === Role.ADMIN) {
+      return [Role.EMPLOYEE, Role.LAB, Role.LAB_EMP, Role.CLIENT];
+    }
+    if (currentUser?.role === Role.LAB) return [Role.LAB_EMP];
+    return [];
+  };
+
+  const availableRoles = getAvailableRoles();
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Users</h1>
-        <button onClick={() => setShowCreate(!showCreate)} className="btn-primary flex items-center gap-2"><FiPlus /> Add User</button>
+        {availableRoles.length > 0 && (
+          <button onClick={() => setShowCreate(!showCreate)} className="btn-primary flex items-center gap-2">
+            <FiPlus /> Add User
+          </button>
+        )}
       </div>
       {showCreate && (
         <div className="glass-card p-6 space-y-4">
@@ -38,7 +73,7 @@ export default function UsersPage() {
             <div><label className="label">Mobile</label><input value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} className="input-field" placeholder="Mobile" /></div>
             <div><label className="label">Role</label>
               <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })} className="input-field">
-                {Object.values(Role).map(r => <option key={r} value={r}>{r.replace('_', ' ')}</option>)}
+                {availableRoles.map(r => <option key={r} value={r}>{r.replace('_', ' ')}</option>)}
               </select>
             </div>
           </div>

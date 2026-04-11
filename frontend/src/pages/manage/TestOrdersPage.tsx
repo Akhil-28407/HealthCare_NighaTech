@@ -1,13 +1,39 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { testOrdersApi, clientsApi, testMasterApi } from '../../api';
 import toast from 'react-hot-toast';
-import { FiPlus } from 'react-icons/fi';
+import { FiPlus, FiCornerDownRight } from 'react-icons/fi';
+import { useAuthStore } from '../../stores/auth.store';
 
 export default function TestOrdersPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ clientId: '', tests: [] as string[], branchId: '', notes: '', discount: 0 });
+  const [form, setForm] = useState({ 
+    clientId: '', 
+    tests: [] as string[], 
+    branchId: '', 
+    notes: '', 
+    discount: 0,
+    autoCollect: true 
+  });
+
+  const getReportsPath = () => {
+    if (!user) return '/';
+    console.log('[TestOrders] Navigating as role:', user.role);
+    const routes: Record<string, string> = {
+      SUPER_ADMIN: '/superadmin/reports',
+      ADMIN: '/admin/reports',
+      LAB: '/lab/reports',
+      LAB_EMP: '/labemp/reports',
+      CLIENT: '/client/reports',
+    };
+    const path = routes[user.role] || '/';
+    console.log('[TestOrders] Target path:', path);
+    return path;
+  };
 
   const { data, isLoading } = useQuery({ queryKey: ['test-orders'], queryFn: () => testOrdersApi.getAll() });
   const { data: clientsData } = useQuery({ queryKey: ['clients-list'], queryFn: () => clientsApi.getAll({ limit: 100 }) });
@@ -15,7 +41,14 @@ export default function TestOrdersPage() {
 
   const createMutation = useMutation({
     mutationFn: (data: any) => testOrdersApi.create(data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['test-orders'] }); toast.success('Order created'); setShowCreate(false); },
+    onSuccess: () => { 
+      queryClient.invalidateQueries({ queryKey: ['test-orders'] }); 
+      toast.success('Order created'); 
+      setShowCreate(false); 
+      if (form.autoCollect) {
+        navigate(getReportsPath());
+      }
+    },
     onError: (err: any) => toast.error(err.response?.data?.message || 'Failed'),
   });
 
@@ -69,6 +102,18 @@ export default function TestOrdersPage() {
               ))}
             </div>
           </div>
+          <div className="flex items-center gap-3 p-4 bg-primary-500/10 rounded-xl border border-primary-500/20">
+            <input 
+              type="checkbox" 
+              id="autoCollect"
+              checked={form.autoCollect} 
+              onChange={(e) => setForm({ ...form, autoCollect: e.target.checked })} 
+              className="w-4 h-4 accent-primary-500"
+            />
+            <label htmlFor="autoCollect" className="text-sm font-medium text-primary-200 cursor-pointer">
+              Auto-collect sample & proceed to Result Entry immediately
+            </label>
+          </div>
           <div>
             <label className="label">Notes</label>
             <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="input-field" rows={2} />
@@ -100,15 +145,22 @@ export default function TestOrdersPage() {
                     order.status === 'COLLECTED' ? 'badge-info' :
                     order.status === 'PROCESSING' ? 'badge-warning' :
                     order.status === 'CANCELLED' ? 'badge-danger' : 'badge-primary'
-                  }`}>{order.status}</span>
+                  }`}>{order.status || 'PENDING'}</span>
                 </td>
-                <td className="text-xs">{new Date(order.createdAt).toLocaleDateString()}</td>
+                <td className="text-xs">{order.createdAt ? new Date(order.createdAt).toLocaleDateString() : '—'}</td>
                 <td>
-                  {order.status === 'ORDERED' && (
-                    <button onClick={() => collectMutation.mutate(order._id)} className="text-xs text-primary-400 hover:text-primary-300 font-medium">
-                      Collect Sample
-                    </button>
-                  )}
+                  <div className="flex items-center gap-3">
+                    {order.status === 'ORDERED' && (
+                      <button onClick={() => collectMutation.mutate(order._id)} className="text-xs text-primary-400 hover:text-primary-300 font-medium whitespace-nowrap">
+                        Collect Sample
+                      </button>
+                    )}
+                    {order.status === 'COLLECTED' && (
+                      <button onClick={() => navigate(getReportsPath())} className="text-xs text-green-400 hover:text-green-300 font-medium whitespace-nowrap flex items-center gap-1">
+                        <FiCornerDownRight /> Enter Results
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

@@ -13,6 +13,7 @@ import { Model } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { User, UserDocument } from '../users/schemas/user.schema';
+import { Client, ClientDocument } from '../clients/schemas/client.schema';
 import { Session, SessionDocument } from '../sessions/schemas/session.schema';
 import { OtpStoreService } from './otp-store.service';
 import { MailService } from '../mail/mail.service';
@@ -35,6 +36,7 @@ export class AuthService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Session.name) private sessionModel: Model<SessionDocument>,
+    @InjectModel(Client.name) private clientModel: Model<ClientDocument>,
     private jwtService: JwtService,
     private configService: ConfigService,
     private otpStore: OtpStoreService,
@@ -97,6 +99,13 @@ export class AuthService {
         name: `User-${dto.mobile.slice(-4)}`,
         role: Role.CLIENT,
       });
+
+      // Create Client profile for new CLIENT user
+      await this.clientModel.create({
+        userId: user._id,
+        name: user.name,
+        mobile: user.mobile,
+      });
     }
 
     // Generate tokens
@@ -118,6 +127,14 @@ export class AuthService {
       password: hashedPassword,
       mobile: dto.mobile,
       role: Role.CLIENT,
+    });
+
+    // Create Client profile for new CLIENT user
+    await this.clientModel.create({
+      userId: user._id,
+      name: user.name,
+      email: user.email,
+      mobile: user.mobile,
     });
 
     return {
@@ -333,6 +350,7 @@ export class AuthService {
         mobile: user.mobile,
         role: user.role,
         name: user.name,
+        branchId: user.branchId?.toString(),
       },
       { expiresIn: this.configService.get('app.jwt.accessExpiry') || '15m' },
     );

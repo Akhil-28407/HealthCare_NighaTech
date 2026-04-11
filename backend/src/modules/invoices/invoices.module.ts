@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Invoice, InvoiceSchema } from './schemas/invoice.schema';
 import { Client, ClientSchema } from '../clients/schemas/client.schema';
+import { Branch, BranchSchema } from '../branches/schemas/branch.schema';
 import { InvoicesService } from './invoices.service';
 import { InvoicesController } from './invoices.controller';
 import { CounterModule } from '../counter/counter.module';
@@ -14,6 +15,7 @@ import { AuthModule } from '../auth/auth.module';
     MongooseModule.forFeature([
       { name: Invoice.name, schema: InvoiceSchema },
       { name: Client.name, schema: ClientSchema },
+      { name: Branch.name, schema: BranchSchema },
     ]),
     CounterModule,
     MailModule,

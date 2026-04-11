@@ -131,6 +131,7 @@ export default function App() {
           <Route element={<ProtectedRoute allowedRoles={[Role.LAB]} />}>
             <Route element={<DashboardLayout />}>
               <Route path="/lab/dashboard" element={<LabDashboard />} />
+              <Route path="/lab/clients" element={<ClientsPage />} />
               <Route path="/lab/orders" element={<TestOrdersPage />} />
               <Route path="/lab/reports" element={<LabReportsPage />} />
               <Route path="/lab/tests" element={<TestCatalogPage />} />
@@ -141,6 +142,7 @@ export default function App() {
           <Route element={<ProtectedRoute allowedRoles={[Role.LAB_EMP]} />}>
             <Route element={<DashboardLayout />}>
               <Route path="/labemp/dashboard" element={<LabDashboard />} />
+              <Route path="/labemp/clients" element={<ClientsPage />} />
               <Route path="/labemp/orders" element={<TestOrdersPage />} />
               <Route path="/labemp/reports" element={<LabReportsPage />} />
             </Route>

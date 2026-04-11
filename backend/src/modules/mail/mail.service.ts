@@ -87,4 +87,34 @@ export class MailService {
       this.logger.error(`Failed to send quotation email:`, error.message);
     }
   }
+  
+  async sendLabReport(to: string, name: string, reportNumber: string, pdfBuffer: Buffer) {
+    try {
+      await this.transporter.sendMail({
+        from: `"Healthcare Lab" <${this.configService.get('app.smtp.user')}>`,
+        to,
+        subject: `Medical Report - ${reportNumber}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #0f766e;">Medical Test Report</h2>
+            <p>Hello ${name},</p>
+            <p>Your medical test report (${reportNumber}) is ready. Please find the attached PDF document.</p>
+            <p>If you have any questions regarding your results, please contact our laboratory.</p>
+            <br/>
+            <p>Best regards,</p>
+            <p><strong>Healthcare Lab Team</strong></p>
+          </div>
+        `,
+        attachments: [
+          {
+            filename: `report-${reportNumber}.pdf`,
+            content: pdfBuffer,
+          },
+        ],
+      });
+      this.logger.log(`Report email sent to ${to}`);
+    } catch (error) {
+      this.logger.error(`Failed to send report email to ${to}:`, error.message);
+    }
+  }
 }

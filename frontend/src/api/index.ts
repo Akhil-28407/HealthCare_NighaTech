@@ -31,6 +31,7 @@ export const branchesApi = {
   getById: (id: string) => api.get(`/branches/${id}`),
   create: (data: any) => api.post('/branches', data),
   update: (id: string, data: any) => api.patch(`/branches/${id}`, data),
+  updateStatus: (id: string, status: string) => api.patch(`/branches/${id}/status`, { status }),
   delete: (id: string) => api.delete(`/branches/${id}`),
 };
 
@@ -60,8 +61,8 @@ export const testOrdersApi = {
 export const labReportsApi = {
   getAll: (params?: any) => api.get('/lab-reports', { params }),
   getById: (id: string) => api.get(`/lab-reports/${id}`),
-  updateResults: (id: string, results: any[]) =>
-    api.patch(`/lab-reports/${id}/results`, { results }),
+  updateResults: (id: string, results: any[], htmlContent?: string) =>
+    api.patch(`/lab-reports/${id}/results`, { results, htmlContent }),
   verify: (id: string) => api.post(`/lab-reports/${id}/verify`),
   downloadPdf: (id: string) =>
     api.get(`/lab-reports/${id}/pdf`, { responseType: 'blob' }),

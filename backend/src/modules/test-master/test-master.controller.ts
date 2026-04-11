@@ -14,7 +14,7 @@ export class TestMasterController {
   constructor(private readonly testMasterService: TestMasterService) {}
 
   @Post()
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.LAB)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.LAB, Role.LAB_EMP)
   @ApiOperation({ summary: 'Create test' })
   create(@Body() dto: any) { return this.testMasterService.create(dto); }
 
@@ -27,7 +27,7 @@ export class TestMasterController {
   findById(@Param('id') id: string) { return this.testMasterService.findById(id); }
 
   @Patch(':id')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.LAB)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.LAB, Role.LAB_EMP)
   @ApiOperation({ summary: 'Update test' })
   update(@Param('id') id: string, @Body() dto: any) { return this.testMasterService.update(id, dto); }
 

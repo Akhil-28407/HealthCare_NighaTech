@@ -104,6 +104,7 @@ export interface LabReport {
   branchId: string | Branch;
   status: 'PENDING' | 'RESULTS_ENTERED' | 'VERIFIED';
   results: ResultParameter[];
+  htmlContent?: string;
   enteredBy?: string | User;
   verifiedBy?: string | User;
   verifiedAt?: string;

@@ -8,7 +8,26 @@ import { User, UserDocument } from './schemas/user.schema';
 export class UsersService {
   constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
 
-  async create(createUserDto: any) {
+  async create(createUserDto: any, creator?: any) {
+    // Role Restrictions
+    if (creator) {
+      const { role: creatorRole, branchId: creatorBranchId } = creator;
+      const targetRole = createUserDto.role;
+
+      // ADMIN cannot create SUPER_ADMIN or ADMIN
+      if (creatorRole === 'ADMIN' && (targetRole === 'SUPER_ADMIN' || targetRole === 'ADMIN')) {
+        throw new ConflictException('Admin cannot create Super Admin or Admin roles');
+      }
+
+      // LAB can only create LAB_EMP for their own branch
+      if (creatorRole === 'LAB') {
+        if (targetRole !== 'LAB_EMP') {
+          throw new ConflictException('Lab role can only create Lab Employee accounts');
+        }
+        createUserDto.branchId = creatorBranchId;
+      }
+    }
+
     const existing = await this.userModel.findOne({
       $or: [
         ...(createUserDto.email ? [{ email: createUserDto.email }] : []),
@@ -82,12 +101,8 @@ export class UsersService {
   }
 
   async delete(id: string) {
-    const user = await this.userModel.findByIdAndUpdate(
-      id,
-      { isActive: false },
-      { new: true },
-    );
+    const user = await this.userModel.findByIdAndDelete(id);
     if (!user) throw new NotFoundException('User not found');
-    return { success: true, message: 'User deactivated' };
+    return { success: true, message: 'User deleted successfully' };
   }
 }

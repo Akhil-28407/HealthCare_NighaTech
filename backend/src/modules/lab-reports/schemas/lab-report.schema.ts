@@ -71,6 +71,9 @@ export class LabReport {
   notes: string;
 
   @Prop()
+  htmlContent: string;
+
+  @Prop()
   qrCode: string;
 }
 

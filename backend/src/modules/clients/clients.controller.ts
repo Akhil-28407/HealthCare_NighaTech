@@ -3,8 +3,8 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ClientsService } from './clients.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { OwnershipGuard } from '../../common/guards/ownership.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Role } from '../../common/enums/role.enum';
 
 @ApiTags('Clients')
@@ -15,22 +15,24 @@ export class ClientsController {
   constructor(private readonly clientsService: ClientsService) {}
 
   @Post()
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.EMPLOYEE)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.EMPLOYEE, Role.LAB, Role.LAB_EMP)
   @ApiOperation({ summary: 'Create client' })
   create(@Body() dto: any) { return this.clientsService.create(dto); }
 
   @Get()
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.EMPLOYEE, Role.LAB)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.EMPLOYEE, Role.LAB, Role.LAB_EMP)
   @ApiOperation({ summary: 'Get all clients' })
-  findAll(@Query() query: any) { return this.clientsService.findAll(query); }
+  findAll(@Query() query: any, @CurrentUser() user: any) { 
+    return this.clientsService.findAll(query, user); 
+  }
 
   @Get(':id')
-  @UseGuards(OwnershipGuard)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.EMPLOYEE, Role.LAB, Role.LAB_EMP)
   @ApiOperation({ summary: 'Get client by ID' })
   findById(@Param('id') id: string) { return this.clientsService.findById(id); }
 
   @Patch(':id')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.EMPLOYEE)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.EMPLOYEE, Role.LAB, Role.LAB_EMP)
   @ApiOperation({ summary: 'Update client' })
   update(@Param('id') id: string, @Body() dto: any) { return this.clientsService.update(id, dto); }
 

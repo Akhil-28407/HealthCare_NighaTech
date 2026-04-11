@@ -1,9 +1,21 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
 import * as Handlebars from 'handlebars';
+import { ReportTemplate, ReportTemplateDocument } from '../templates/schemas/report-template.schema';
 
 @Injectable()
 export class PdfService {
   private readonly logger = new Logger(PdfService.name);
+
+  constructor(
+    @InjectModel(ReportTemplate.name) private templateModel: Model<ReportTemplateDocument>,
+  ) {
+    // Register helpers once
+    if (!Handlebars.helpers.eq) {
+      Handlebars.registerHelper('eq', (a, b) => a === b);
+    }
+  }
 
   private getDefaultReportTemplate(): string {
     return `<!DOCTYPE html>
@@ -32,6 +44,7 @@ export class PdfService {
     .signature { text-align: center; }
     .signature .line { width: 150px; border-top: 1px solid #333; margin: 30px auto 5px; }
     .timestamp { text-align: center; color: #888; font-size: 10px; margin-top: 15px; }
+    .html-content { margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px; font-size: 11px; }
   </style>
 </head>
 <body>
@@ -61,6 +74,7 @@ export class PdfService {
 
   <div class="report-title">{{testName}} - Test Report</div>
 
+  {{#if results.length}}
   <table>
     <thead>
       <tr>
@@ -87,6 +101,13 @@ export class PdfService {
       {{/each}}
     </tbody>
   </table>
+  {{/if}}
+
+  {{#if htmlContent}}
+  <div class="html-content">
+    {{{htmlContent}}}
+  </div>
+  {{/if}}
 
   <div class="footer">
     <div class="signature">
@@ -178,30 +199,47 @@ export class PdfService {
   }
 
   async generateLabReportPdf(report: any): Promise<Buffer> {
-    // Register helpers
-    Handlebars.registerHelper('eq', (a, b) => a === b);
 
-    const template = Handlebars.compile(this.getDefaultReportTemplate());
-    const html = template({
+    // Try to find branch-specific lab_report template
+    const branchTemplate = await this.templateModel.findOne({
+      branchId: report.branchId?._id || report.branchId,
+      type: 'lab_report',
+      isActive: true,
+    }).lean();
+
+    const data = {
       branch: report.branchId || { labName: 'Healthcare Lab', address: '', phone: '', email: '' },
       patient: report.clientId || {},
       reportNumber: report.reportNumber,
       orderNumber: report.testOrderId?.orderNumber || '',
       testName: report.testId?.name || 'Lab Test',
       results: report.results || [],
+      htmlContent: report.htmlContent || '',
       qrCode: report.qrCode,
       enteredBy: report.enteredBy?.name || '',
       verifiedBy: report.verifiedBy?.name || '',
       reportDate: new Date(report.createdAt || Date.now()).toLocaleDateString(),
       generatedAt: new Date().toLocaleString(),
-    });
+    };
 
+    if (branchTemplate) {
+      return this.renderFromTemplate(branchTemplate.content, data);
+    }
+
+    const template = Handlebars.compile(this.getDefaultReportTemplate());
+    const html = template(data);
     return this.htmlToPdf(html);
   }
 
   async generateInvoicePdf(invoice: any, type = 'INVOICE'): Promise<Buffer> {
-    const template = Handlebars.compile(this.getDefaultInvoiceTemplate());
-    const html = template({
+    // Try to find branch-specific template for invoice/quotation
+    const branchTemplate = await this.templateModel.findOne({
+      branchId: invoice.branchId?._id || invoice.branchId,
+      type: type.toLowerCase(),
+      isActive: true,
+    }).lean();
+
+    const data = {
       title: type,
       branch: invoice.branchId || { labName: 'Healthcare Lab' },
       client: invoice.clientId || {},
@@ -215,8 +253,14 @@ export class PdfService {
       discount: invoice.discount,
       total: invoice.total,
       generatedAt: new Date().toLocaleString(),
-    });
+    };
 
+    if (branchTemplate) {
+      return this.renderFromTemplate(branchTemplate.content, data);
+    }
+
+    const template = Handlebars.compile(this.getDefaultInvoiceTemplate());
+    const html = template(data);
     return this.htmlToPdf(html);
   }
 
@@ -229,36 +273,77 @@ export class PdfService {
   private async htmlToPdf(html: string): Promise<Buffer> {
     let browser;
     try {
-      // Dynamic imports for Vercel environment
       const isVercel = process.env.VERCEL || process.env.NODE_ENV === 'production';
       
       if (isVercel) {
-        console.log('📦 Loading serverless Chromium/Puppeteer...');
+        this.logger.log('📦 Launching serverless Chromium (Vercel)...');
         try {
           const chromium = require('@sparticuz/chromium');
           const puppeteer = require('puppeteer-core');
           
           browser = await puppeteer.launch({
-            args: chromium.args,
+            args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
             defaultViewport: chromium.defaultViewport,
             executablePath: await chromium.executablePath(),
             headless: chromium.headless,
             ignoreHTTPSErrors: true,
           });
         } catch (e) {
-          console.error('❌ Failed to load serverless Chromium libraries:', e.message);
-          throw new Error('Chromium/Puppeteer initialization failed on Vercel');
+          this.logger.error('❌ Failed to load serverless Chromium:', e.message);
+          throw new Error(`Serverless PDF launch failed: ${e.message}`);
         }
       } else {
-        const puppeteer = require('puppeteer');
-        browser = await puppeteer.launch({
-          headless: 'new',
-          args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-        });
+        try {
+          this.logger.log('🚀 Launching local browser for PDF generation...');
+          let puppeteer;
+          try {
+            // Prefer puppeteer-core for manual executable paths to avoid binary conflicts
+            puppeteer = require('puppeteer-core');
+          } catch {
+            puppeteer = require('puppeteer');
+          }
+
+          browser = await puppeteer.launch({
+            headless: 'new',
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || (() => {
+              const chromePaths = [
+                '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+                '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
+                '/usr/bin/google-chrome',
+                '/usr/bin/chromium-browser'
+              ];
+              const fs = require('fs');
+              for (const path of chromePaths) {
+                if (fs.existsSync(path)) {
+                  this.logger.log(`🔍 Using detected browser at: ${path}`);
+                  return path;
+                }
+              }
+              return undefined;
+            })(),
+            args: [
+              '--no-sandbox',
+              '--disable-setuid-sandbox',
+              '--disable-dev-shm-usage',
+              '--disable-gpu',
+              '--font-render-hinting=none',
+              '--remote-debugging-port=9222',
+            ],
+            timeout: 60000,
+            ignoreHTTPSErrors: true,
+          });
+        } catch (e) {
+          this.logger.error('❌ Browser launch failed:', e.stack);
+          throw new Error(`PDF Engine Error: ${e.message}. Please ensure Google Chrome or Brave is installed.`);
+        }
       }
 
       const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'networkidle0' });
+      // Use 'load' instead of 'networkidle0' to prevent timeouts on external assets like fonts
+      await page.setContent(html, { 
+        waitUntil: 'load',
+        timeout: 60000 
+      });
       const pdf = await page.pdf({
         format: 'A4',
         printBackground: true,

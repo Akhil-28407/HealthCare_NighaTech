@@ -1,11 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ConfigService } from '@nestjs/config';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Invoice, InvoiceDocument, InvoiceStatus } from './schemas/invoice.schema';
 import { Client, ClientDocument } from '../clients/schemas/client.schema';
 import { CounterService } from '../counter/counter.service';
 import { MailService } from '../mail/mail.service';
+import { Role } from '../../common/enums/role.enum';
 
 @Injectable()
 export class InvoicesService {
@@ -35,11 +36,21 @@ export class InvoicesService {
     });
   }
 
-  async findAll(query: any = {}) {
-    const { page = 1, limit = 20, status, clientId } = query;
+  async findAll(query: any = {}, user?: any) {
+    const { page = 1, limit = 20, status, clientId, branchId } = query;
     const filter: any = {};
+    
+    // Role-based branch isolation
+    if (user && (user.role === 'LAB' || user.role === 'LAB_EMP')) {
+      if (user.branchId && Types.ObjectId.isValid(user.branchId)) {
+        filter.branchId = user.branchId;
+      }
+    } else if (branchId && Types.ObjectId.isValid(branchId)) {
+      filter.branchId = branchId;
+    }
+
     if (status) filter.status = status;
-    if (clientId) filter.clientId = clientId;
+    if (clientId && Types.ObjectId.isValid(clientId)) filter.clientId = clientId;
 
     const [invoices, total] = await Promise.all([
       this.invoiceModel.find(filter)

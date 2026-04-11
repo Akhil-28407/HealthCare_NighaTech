@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 export type ReportTemplateDocument = ReportTemplate & Document;
 
@@ -22,6 +22,8 @@ export class ReportTemplate {
 
   @Prop({ default: true })
   isActive: boolean;
+  @Prop({ type: Types.ObjectId, ref: 'Branch' })
+  branchId: Types.ObjectId;
 }
 
 export const ReportTemplateSchema = SchemaFactory.createForClass(ReportTemplate);

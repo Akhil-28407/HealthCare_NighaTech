@@ -9,6 +9,7 @@ import { JwtStrategy } from './jwt.strategy';
 import { OtpStoreService } from './otp-store.service';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { Session, SessionSchema } from '../sessions/schemas/session.schema';
+import { Client, ClientSchema } from '../clients/schemas/client.schema';
 import { MailModule } from '../mail/mail.module';
 import { SmsModule } from '../sms/sms.module';
 
@@ -26,6 +27,7 @@ import { SmsModule } from '../sms/sms.module';
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
       { name: Session.name, schema: SessionSchema },
+      { name: Client.name, schema: ClientSchema },
     ]),
     MailModule,
     SmsModule,

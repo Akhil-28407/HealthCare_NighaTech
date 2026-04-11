@@ -4,6 +4,7 @@ import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Role } from '../../common/enums/role.enum';
 
 @ApiTags('Users')
@@ -14,10 +15,10 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.LAB)
   @ApiOperation({ summary: 'Create a new user' })
-  create(@Body() createUserDto: any) {
-    return this.usersService.create(createUserDto);
+  create(@Body() createUserDto: any, @CurrentUser() user: any) {
+    return this.usersService.create(createUserDto, user);
   }
 
   @Get()

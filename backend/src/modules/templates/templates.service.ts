@@ -12,11 +12,20 @@ export class TemplatesService {
 
   async create(dto: any) { return this.templateModel.create(dto); }
 
-  async findAll(query: any = {}) {
+  async findAll(query: any = {}, user?: any) {
     const { type } = query;
     const filter: any = { isActive: true };
     if (type) filter.type = type;
-    return this.templateModel.find(filter).sort({ createdAt: -1 }).lean();
+
+    if (user && user.role === 'LAB') {
+      filter.$or = [
+        { branchId: user.branchId },
+        { branchId: { $exists: false } },
+        { branchId: null },
+      ];
+    }
+    
+    return this.templateModel.find(filter).sort({ isDefault: -1, createdAt: -1 }).lean();
   }
 
   async findById(id: string) {
@@ -25,15 +34,28 @@ export class TemplatesService {
     return template;
   }
 
-  async update(id: string, dto: any) {
-    const template = await this.templateModel.findByIdAndUpdate(id, dto, { new: true }).lean();
+  async update(id: string, dto: any, user?: any) {
+    const template = await this.templateModel.findById(id);
     if (!template) throw new NotFoundException('Template not found');
-    return template;
+
+    if (user && user.role === 'LAB' && template.branchId?.toString() !== user.branchId.toString()) {
+      throw new NotFoundException('You can only update your own branch templates');
+    }
+
+    Object.assign(template, dto);
+    return template.save();
   }
 
-  async delete(id: string) {
-    const template = await this.templateModel.findByIdAndUpdate(id, { isActive: false }, { new: true });
+  async delete(id: string, user?: any) {
+    const template = await this.templateModel.findById(id);
     if (!template) throw new NotFoundException('Template not found');
+
+    if (user && user.role === 'LAB' && template.branchId?.toString() !== user.branchId.toString()) {
+      throw new NotFoundException('You can only delete your own branch templates');
+    }
+
+    template.isActive = false;
+    await template.save();
     return { success: true, message: 'Template deactivated' };
   }
 

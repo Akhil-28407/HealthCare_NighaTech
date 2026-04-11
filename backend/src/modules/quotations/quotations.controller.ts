@@ -7,6 +7,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('Quotations')
 @Controller('quotations')
@@ -19,15 +20,19 @@ export class QuotationsController {
   ) {}
 
   @Post()
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.EMPLOYEE)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.EMPLOYEE, Role.LAB, Role.LAB_EMP)
   @ApiOperation({ summary: 'Create quotation' })
   create(@Body() dto: any) { return this.service.create(dto); }
 
   @Get()
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.EMPLOYEE, Role.LAB, Role.LAB_EMP)
   @ApiOperation({ summary: 'Get all quotations' })
-  findAll(@Query() query: any) { return this.service.findAll(query); }
+  findAll(@Query() query: any, @CurrentUser() user: any) { 
+    return this.service.findAll(query, user); 
+  }
 
   @Get(':id')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.EMPLOYEE, Role.LAB, Role.LAB_EMP)
   @ApiOperation({ summary: 'Get quotation by ID' })
   findById(@Param('id') id: string) { return this.service.findById(id); }
 
@@ -44,12 +49,12 @@ export class QuotationsController {
   }
 
   @Post(':id/send')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.EMPLOYEE)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.EMPLOYEE, Role.LAB, Role.LAB_EMP)
   @ApiOperation({ summary: 'Send quotation via email' })
   send(@Param('id') id: string) { return this.service.send(id); }
 
   @Post(':id/convert')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.EMPLOYEE)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.EMPLOYEE, Role.LAB, Role.LAB_EMP)
   @ApiOperation({ summary: 'Convert quotation to invoice' })
   convert(@Param('id') id: string) { return this.service.convertToInvoice(id); }
 }

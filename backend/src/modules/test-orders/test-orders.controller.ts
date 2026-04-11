@@ -23,7 +23,9 @@ export class TestOrdersController {
 
   @Get()
   @ApiOperation({ summary: 'Get all test orders' })
-  findAll(@Query() query: any) { return this.service.findAll(query); }
+  findAll(@Query() query: any, @CurrentUser() user: any) { 
+    return this.service.findAll(query, user); 
+  }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get test order by ID' })

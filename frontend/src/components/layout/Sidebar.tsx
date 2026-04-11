@@ -42,12 +42,14 @@ const menuItems: Record<string, { label: string; icon: any; path: string }[]> = 
   ],
   [Role.LAB]: [
     { label: 'Dashboard', icon: FiHome, path: '/lab/dashboard' },
+    { label: 'Patients', icon: FiUserCheck, path: '/lab/clients' },
     { label: 'Test Orders', icon: FiFileText, path: '/lab/orders' },
     { label: 'Lab Reports', icon: FiActivity, path: '/lab/reports' },
     { label: 'Test Catalog', icon: FiClipboard, path: '/lab/tests' },
   ],
   [Role.LAB_EMP]: [
     { label: 'Dashboard', icon: FiHome, path: '/labemp/dashboard' },
+    { label: 'Patients', icon: FiUserCheck, path: '/labemp/clients' },
     { label: 'Test Orders', icon: FiFileText, path: '/labemp/orders' },
     { label: 'Lab Reports', icon: FiActivity, path: '/labemp/reports' },
   ],

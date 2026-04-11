@@ -19,6 +19,7 @@ import { CounterModule } from './modules/counter/counter.module';
 import { PdfModule } from './modules/pdf/pdf.module';
 import { MailModule } from './modules/mail/mail.module';
 import { SmsModule } from './modules/sms/sms.module';
+import { SeedModule } from './modules/seed/seed.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { SmsModule } from './modules/sms/sms.module';
     PdfModule,
     MailModule,
     SmsModule,
+    SeedModule,
   ],
 })
 export class AppModule {}

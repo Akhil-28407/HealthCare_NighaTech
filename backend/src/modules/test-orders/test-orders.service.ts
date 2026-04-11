@@ -19,8 +19,8 @@ export class TestOrdersService {
     const orderNumber = await this.counterService.generateNumber('ORD', 'test-order');
 
     // Calculate total from tests
-    const tests = await this.testModel.find({ _id: { $in: dto.tests } }).lean();
-    const totalAmount = tests.reduce((sum, t) => sum + (t.price || 0), 0);
+    const testsData = await this.testModel.find({ _id: { $in: dto.tests } }).lean();
+    const totalAmount = testsData.reduce((sum, t) => sum + (t.price || 0), 0);
     const discount = dto.discount || 0;
     const netAmount = totalAmount - discount;
 
@@ -31,17 +31,56 @@ export class TestOrdersService {
       totalAmount,
       discount,
       netAmount,
+      status: dto.autoCollect ? TestOrderStatus.COLLECTED : TestOrderStatus.ORDERED,
+      sampleCollectedAt: dto.autoCollect ? new Date() : undefined,
+      collectedBy: dto.autoCollect ? new Types.ObjectId(userId) : undefined,
     });
+
+    // Create lab reports for each test if autoCollect is true
+    if (dto.autoCollect) {
+      for (const test of testsData) {
+        const reportNumber = await this.counterService.generateNumber('RPT', 'lab-report');
+        await this.reportModel.create({
+          reportNumber,
+          testOrderId: order._id,
+          clientId: order.clientId,
+          testId: test._id,
+          branchId: order.branchId && Types.ObjectId.isValid(order.branchId) ? order.branchId : undefined,
+          status: ReportStatus.PENDING,
+          results: test.parameters.map(p => ({
+            name: p.name,
+            unit: p.unit,
+            normalRangeMin: p.normalRangeMin,
+            normalRangeMax: p.normalRangeMax,
+            normalRangeText: p.normalRangeText,
+            method: p.method,
+            value: '',
+            flag: '',
+          })),
+        });
+      }
+    }
 
     return order;
   }
 
-  async findAll(query: any = {}) {
-    const { page = 1, limit = 20, status, clientId, branchId } = query;
+  async findAll(query: any = {}, user?: any) {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 20;
+    const { status, clientId, branchId } = query;
     const filter: any = {};
+    
+    // Role-based branch isolation
+    if (user && (user.role === 'LAB' || user.role === 'LAB_EMP')) {
+      if (user.branchId && Types.ObjectId.isValid(user.branchId)) {
+        filter.branchId = user.branchId;
+      }
+    } else if (branchId && Types.ObjectId.isValid(branchId)) {
+      filter.branchId = branchId;
+    }
+
     if (status) filter.status = status;
     if (clientId) filter.clientId = clientId;
-    if (branchId) filter.branchId = branchId;
 
     const [orders, total] = await Promise.all([
       this.orderModel.find(filter)
@@ -52,7 +91,7 @@ export class TestOrdersService {
         .skip((page - 1) * limit).limit(limit).sort({ createdAt: -1 }).lean(),
       this.orderModel.countDocuments(filter),
     ]);
-    return { orders, total, page: Number(page), limit: Number(limit) };
+    return { orders, total, page, limit };
   }
 
   async findById(id: string) {
@@ -87,7 +126,7 @@ export class TestOrdersService {
         testOrderId: order._id,
         clientId: order.clientId,
         testId: test._id,
-        branchId: order.branchId,
+        branchId: order.branchId && Types.ObjectId.isValid(order.branchId) ? order.branchId : undefined,
         status: ReportStatus.PENDING,
         results: test.parameters.map(p => ({
           name: p.name,

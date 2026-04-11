@@ -50,17 +50,27 @@ export class LabReportsController {
   updateResults(
     @Param('id') id: string,
     @Body('results') results: any[],
+    @Body('htmlContent') htmlContent: string,
     @CurrentUser('sub') userId: string,
   ) {
-    return this.service.updateResults(id, results, userId);
+    return this.service.updateResults(id, results, userId, htmlContent);
   }
 
   @Post(':id/verify')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.LAB)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.LAB, Role.LAB_EMP)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Verify lab report' })
   verify(@Param('id') id: string, @CurrentUser('sub') userId: string) {
     return this.service.verifyReport(id, userId);
+  }
+
+  @Post(':id/send')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.LAB, Role.LAB_EMP)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Manually send lab report via email' })
+  send(@Param('id') id: string) {
+    return this.service.sendReportEmail(id);
   }
 }

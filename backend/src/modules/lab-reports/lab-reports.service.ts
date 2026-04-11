@@ -8,6 +8,9 @@ import { TestOrder, TestOrderDocument, TestOrderStatus } from '../test-orders/sc
 import { Client, ClientDocument } from '../clients/schemas/client.schema';
 import { Role } from '../../common/enums/role.enum';
 
+import { PdfService } from '../pdf/pdf.service';
+import { MailService } from '../mail/mail.service';
+
 @Injectable()
 export class LabReportsService {
   constructor(
@@ -15,43 +18,55 @@ export class LabReportsService {
     @InjectModel(TestOrder.name) private orderModel: Model<TestOrderDocument>,
     @InjectModel(Client.name) private clientModel: Model<ClientDocument>,
     private configService: ConfigService,
+    private pdfService: PdfService,
+    private mailService: MailService,
   ) {}
 
   async findAll(query: any = {}, user: any) {
-    const { page = 1, limit = 20, status, clientId, testOrderId } = query;
-    const filter: any = {};
-    
-    // Role based filtering
-    if (user.role === Role.CLIENT) {
-      const client = await this.clientModel.findOne({ userId: user.sub }).lean();
-      if (client) {
-        filter.clientId = client._id;
-        // Specifically for clients, only show VERIFIED reports by default
-        if (!status) {
-          filter.status = ReportStatus.VERIFIED;
+    try {
+      const page = Number(query.page) || 1;
+      const limit = Number(query.limit) || 20;
+      const { status, clientId, testOrderId, branchId } = query;
+      const filter: any = {};
+      
+      // Role based filtering
+      if (user.role === Role.CLIENT) {
+        const client = await this.clientModel.findOne({ userId: user.sub }).lean();
+        if (client) {
+          filter.clientId = client._id;
+          if (!status) filter.status = ReportStatus.VERIFIED;
+        } else {
+          return { reports: [], total: 0, page, limit };
         }
-      } else {
-        // If no client profile found for user, return empty results
-        return { reports: [], total: 0, page: Number(page), limit: Number(limit) };
+      } else if (user.role === Role.LAB || user.role === Role.LAB_EMP) {
+        if (user.branchId && Types.ObjectId.isValid(user.branchId)) {
+          filter.branchId = user.branchId;
+        }
+      } else if (branchId && Types.ObjectId.isValid(branchId)) {
+        filter.branchId = branchId;
       }
-    } else if (clientId) {
-      filter.clientId = clientId;
+
+      // Robust check for other filters (prevent empty string cast errors)
+      if (clientId && Types.ObjectId.isValid(clientId)) filter.clientId = clientId;
+      if (testOrderId && Types.ObjectId.isValid(testOrderId)) filter.testOrderId = testOrderId;
+      if (status && status !== '') filter.status = status;
+
+      const [reports, total] = await Promise.all([
+        this.reportModel.find(filter)
+          .populate('clientId', 'name email mobile age gender')
+          .populate('testId', 'name code category')
+          .populate('testOrderId', 'orderNumber')
+          .populate('branchId', 'name')
+          .populate('enteredBy', 'name')
+          .populate('verifiedBy', 'name')
+          .skip((page - 1) * limit).limit(limit).sort({ createdAt: -1 }).lean(),
+        this.reportModel.countDocuments(filter),
+      ]);
+      return { reports, total, page, limit };
+    } catch (error) {
+      console.error('[LabReportsService.findAll] Error:', error.message);
+      throw error;
     }
-
-    if (status) filter.status = status;
-    if (testOrderId) filter.testOrderId = testOrderId;
-
-    const [reports, total] = await Promise.all([
-      this.reportModel.find(filter)
-        .populate('clientId', 'name email mobile age gender')
-        .populate('testId', 'name code category')
-        .populate('testOrderId', 'orderNumber')
-        .populate('enteredBy', 'name')
-        .populate('verifiedBy', 'name')
-        .skip((page - 1) * limit).limit(limit).sort({ createdAt: -1 }).lean(),
-      this.reportModel.countDocuments(filter),
-    ]);
-    return { reports, total, page: Number(page), limit: Number(limit) };
   }
 
   async findById(id: string) {
@@ -67,29 +82,39 @@ export class LabReportsService {
     return report;
   }
 
-  async updateResults(id: string, results: any[], userId: string) {
+  async updateResults(id: string, results: any[], userId: string, htmlContent?: string) {
     const report = await this.reportModel.findById(id);
     if (!report) throw new NotFoundException('Lab report not found');
     if (report.status === ReportStatus.VERIFIED) {
       throw new BadRequestException('Cannot modify a verified report');
     }
 
-    // Auto-detect flags
-    const flaggedResults = results.map(r => {
-      let flag = 'N';
-      const numValue = parseFloat(r.value);
-      if (!isNaN(numValue)) {
-        if (r.normalRangeMin != null && numValue < r.normalRangeMin) flag = 'L';
-        else if (r.normalRangeMax != null && numValue > r.normalRangeMax) flag = 'H';
-      }
-      return { ...r, flag };
-    });
+    if (results && Array.isArray(results)) {
+      // Auto-detect flags
+      const flaggedResults = results.map(r => {
+        let flag = 'N';
+        const numValue = parseFloat(r.value);
+        if (!isNaN(numValue)) {
+          if (r.normalRangeMin != null && numValue < r.normalRangeMin) flag = 'L';
+          else if (r.normalRangeMax != null && numValue > r.normalRangeMax) flag = 'H';
+        }
+        return { ...r, flag };
+      });
+      report.results = flaggedResults;
+    }
 
-    report.results = flaggedResults;
+    if (htmlContent !== undefined) {
+      report.htmlContent = htmlContent;
+    }
+
     report.status = ReportStatus.RESULTS_ENTERED;
-    report.enteredBy = new Types.ObjectId(userId);
+    
+    // Ensure valid ObjectId for enteredBy
+    if (userId && Types.ObjectId.isValid(userId)) {
+      report.enteredBy = new Types.ObjectId(userId);
+    }
+    
     await report.save();
-
     return report;
   }
 
@@ -119,6 +144,35 @@ export class LabReportsService {
       });
     }
 
+    // TRIGGER AUTOMATED EMAIL
+    try {
+      await this.sendReportEmail(id);
+    } catch (e) {
+      console.error('Failed to send automated report email:', e.message);
+    }
+
     return report;
+  }
+
+  async sendReportEmail(id: string) {
+    const report = await this.findById(id);
+    if (report.status !== ReportStatus.VERIFIED) {
+      throw new BadRequestException('Report must be verified before sending');
+    }
+
+    const client = report.clientId as any;
+    if (!client?.email) {
+      throw new BadRequestException('Patient email not found');
+    }
+
+    const pdfBuffer = await this.pdfService.generateLabReportPdf(report);
+    await this.mailService.sendLabReport(
+      client.email,
+      client.name,
+      report.reportNumber,
+      pdfBuffer
+    );
+
+    return { success: true, message: 'Report email sent successfully' };
   }
 }
