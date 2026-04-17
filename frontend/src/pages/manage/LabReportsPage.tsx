@@ -5,7 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { 
   FiEye, FiEdit3, FiCheckCircle, FiDownload, FiMail, 
-  FiClock, FiActivity, FiAlertCircle, FiSearch, FiFilter, FiFileText 
+  FiClock, FiActivity, FiSearch, FiFileText 
 } from 'react-icons/fi';
 import { useAuthStore } from '../../stores/auth.store';
 import { Role } from '../../types';
@@ -281,8 +281,8 @@ export default function LabReportsPage() {
               {/* Internal Report View */}
               <div className="flex justify-between items-center border-b-2 border-primary-600 pb-4">
                 <div>
-                  <h3 className="text-2xl font-bold text-primary-700">{user?.branchId?.labName || 'NighaTech Healthcare Lab'}</h3>
-                  <p className="text-xs text-gray-500">{user?.branchId?.address}</p>
+                  <h3 className="text-2xl font-bold text-primary-700">{(user?.branchId as any)?.labName || 'NighaTech Healthcare Lab'}</h3>
+                  <p className="text-xs text-gray-500">{(user?.branchId as any)?.address}</p>
                 </div>
                 <div className="text-right">
                   <div className="text-xs font-bold uppercase text-gray-400">Date Generated</div>

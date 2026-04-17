@@ -67,7 +67,6 @@ export default function BranchesPage() {
 
   const createMutation = useMutation({
     mutationFn: (d: any) => {
-      // If admin, use the direct creation API that also creates the user account
       if (isAdminRole) return authApi.createLab(d);
       return branchesApi.create(d);
     },
@@ -90,7 +89,7 @@ export default function BranchesPage() {
       if (!accessToken) throw new Error('No access token received');
       startImpersonating(user, accessToken, refreshToken);
       toast.success(`Now viewing as ${user.name}`);
-      window.location.href = '/'; // Full reload to ensure interceptors and state are fresh
+      window.location.href = '/'; 
     },
     onError: (err: any) => {
       const message = err.response?.data?.message || err.message || 'Impersonation failed';
@@ -142,6 +141,7 @@ export default function BranchesPage() {
       contactPersonNumber: branch.contactPersonNumber || '',
       websiteUrl: branch.websiteUrl || '',
       logoUrl: branch.logoUrl || '',
+      password: '', 
     });
   };
 
@@ -161,7 +161,6 @@ export default function BranchesPage() {
         </button>
       </div>
 
-      {/* Tabs */}
       {!isLabRole && <div className="flex border-b border-surface-800">
         {(['ALL', BranchStatus.APPROVED, BranchStatus.PENDING, BranchStatus.REJECTED] as const).map((tab) => (
           <button

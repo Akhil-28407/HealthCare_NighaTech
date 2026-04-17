@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { clientsApi } from '../../api';
 import toast from 'react-hot-toast';
@@ -10,7 +10,6 @@ export default function ClientsPage() {
   const [form, setForm] = useState({ name: '', email: '', mobile: '', age: '', gender: 'Male', address: '', referredBy: '' });
   
   // Search state
-  const [searchMobile, setSearchMobile] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
@@ -44,7 +43,6 @@ export default function ClientsPage() {
 
   const resetForm = () => {
     setForm({ name: '', email: '', mobile: '', age: '', gender: 'Male', address: '', referredBy: '' });
-    setSearchMobile('');
     setSearchResults([]);
   };
 

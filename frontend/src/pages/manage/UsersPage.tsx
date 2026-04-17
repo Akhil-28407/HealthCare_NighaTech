@@ -55,7 +55,6 @@ export default function UsersPage() {
 
   const availableRoles = getAvailableRoles();
   const isBranchPending = currentUser?.role === Role.LAB && !currentUser.branchId;
-  const hasError = (data as any)?.data?.error === 'Branch not approved';
 
   const handleSyncStatus = async () => {
     setIsSyncing(true);
