@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 export class TestParameter {
   @Prop({ required: true })
@@ -25,6 +25,9 @@ export type TestMasterDocument = TestMaster & Document;
 
 @Schema({ timestamps: true })
 export class TestMaster {
+  @Prop({ type: Types.ObjectId, ref: 'Branch' })
+  branchId: Types.ObjectId;
+
   @Prop({ required: true, trim: true })
   name: string;
 

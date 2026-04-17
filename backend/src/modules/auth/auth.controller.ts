@@ -12,6 +12,9 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { Role } from '../../common/enums/role.enum';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import {
   SendOtpDto,
@@ -21,6 +24,7 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
   RefreshTokenDto,
+  RegisterVendorDto,
 } from './dto/auth.dto';
 
 @ApiTags('Auth')
@@ -41,9 +45,33 @@ export class AuthController {
   }
 
   @Post('register')
-  @ApiOperation({ summary: 'Register with email/password' })
-  register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  @ApiOperation({ summary: 'Register a new user' })
+  register(@Body() registerDto: RegisterDto) {
+    return this.authService.register(registerDto);
+  }
+
+  @Post('create-lab')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create and auto-approve a new lab (Admin/Superadmin only)' })
+  createLab(@Body() dto: any) {
+    return this.authService.createLab(dto);
+  }
+
+  @Post('register-vendor')
+  @ApiOperation({ summary: 'Register a new vendor (lab)' })
+  registerVendor(@Body() registerVendorDto: RegisterVendorDto) {
+    return this.authService.registerVendor(registerVendorDto);
+  }
+
+  @Post('impersonate/:userId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Login as another user (Admin/Superadmin only)' })
+  impersonate(@Param('userId') userId: string, @Req() req) {
+    return this.authService.impersonate(userId, req.ip);
   }
 
   @Post('login')
@@ -108,5 +136,13 @@ export class AuthController {
   @ApiOperation({ summary: 'Revoke all sessions' })
   revokeAllSessions(@CurrentUser('sub') userId: string) {
     return this.authService.revokeAllSessions(userId);
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user profile' })
+  getMe(@CurrentUser() user: any) {
+    return { data: user };
   }
 }

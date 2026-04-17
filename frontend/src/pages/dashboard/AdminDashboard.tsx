@@ -22,15 +22,24 @@ function StatCard({ icon: Icon, label, value, color, link }: any) {
 }
 
 export default function SuperAdminDashboard() {
-  const { user } = useAuthStore();
+  const { user, accessToken } = useAuthStore();
   const basePath = user?.role === 'ADMIN' ? '/admin' : '/superadmin';
+  const isQueryEnabled = Boolean(accessToken && user?._id);
+  const scopeKey = user?._id || 'anonymous';
 
-  const { data: usersData } = useQuery({ queryKey: ['users'], queryFn: () => usersApi.getAll({ limit: 1 }) });
-  const { data: branchesData } = useQuery({ queryKey: ['branches'], queryFn: () => branchesApi.getAll({ limit: 1 }) });
-  const { data: clientsData } = useQuery({ queryKey: ['clients'], queryFn: () => clientsApi.getAll({ limit: 1 }) });
-  const { data: ordersData } = useQuery({ queryKey: ['orders'], queryFn: () => testOrdersApi.getAll({ limit: 5 }) });
-  const { data: reportsData } = useQuery({ queryKey: ['reports'], queryFn: () => labReportsApi.getAll({ limit: 5 }) });
-  const { data: invoicesData } = useQuery({ queryKey: ['invoices'], queryFn: () => invoicesApi.getAll({ limit: 5 }) });
+  const { data: usersData } = useQuery({ queryKey: ['dashboard', scopeKey, 'users', 1], queryFn: () => usersApi.getAll({ limit: 1 }), enabled: isQueryEnabled });
+  const { data: branchesData } = useQuery({ queryKey: ['dashboard', scopeKey, 'branches', 1], queryFn: () => branchesApi.getAll({ limit: 1 }), enabled: isQueryEnabled });
+  const { data: clientsData } = useQuery({ queryKey: ['dashboard', scopeKey, 'clients', 1], queryFn: () => clientsApi.getAll({ limit: 1 }), enabled: isQueryEnabled });
+  const { data: ordersData } = useQuery({ queryKey: ['dashboard', scopeKey, 'orders', 5], queryFn: () => testOrdersApi.getAll({ limit: 5 }), enabled: isQueryEnabled });
+  const { data: reportsData } = useQuery({ queryKey: ['dashboard', scopeKey, 'reports', 5], queryFn: () => labReportsApi.getAll({ limit: 5 }), enabled: isQueryEnabled });
+  const { data: invoicesData } = useQuery({ queryKey: ['dashboard', scopeKey, 'invoices', 5], queryFn: () => invoicesApi.getAll({ limit: 5 }), enabled: isQueryEnabled });
+
+  const usersTotal = usersData?.data?.total ?? usersData?.data?.users?.length ?? 0;
+  const branchesTotal = branchesData?.data?.total ?? branchesData?.data?.branches?.length ?? 0;
+  const clientsTotal = clientsData?.data?.total ?? clientsData?.data?.clients?.length ?? 0;
+  const ordersTotal = ordersData?.data?.total ?? ordersData?.data?.orders?.length ?? 0;
+  const reportsTotal = reportsData?.data?.total ?? reportsData?.data?.reports?.length ?? 0;
+  const invoicesTotal = invoicesData?.data?.total ?? invoicesData?.data?.invoices?.length ?? 0;
 
   return (
     <div className="space-y-8">
@@ -41,12 +50,12 @@ export default function SuperAdminDashboard() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-        <StatCard icon={FiUsers} label="Total Users" value={usersData?.data?.total} color="bg-gradient-to-br from-blue-500 to-blue-600" link={`${basePath}/users`} />
-        <StatCard icon={FiMapPin} label="Branches" value={branchesData?.data?.total} color="bg-gradient-to-br from-purple-500 to-purple-600" link={`${basePath}/branches`} />
-        <StatCard icon={FiUserCheck} label="Clients" value={clientsData?.data?.total} color="bg-gradient-to-br from-green-500 to-green-600" link={`${basePath}/clients`} />
-        <StatCard icon={FiFileText} label="Test Orders" value={ordersData?.data?.total} color="bg-gradient-to-br from-orange-500 to-orange-600" link={`${basePath}/orders`} />
-        <StatCard icon={FiActivity} label="Lab Reports" value={reportsData?.data?.total} color="bg-gradient-to-br from-red-500 to-red-600" link={`${basePath}/reports`} />
-        <StatCard icon={FiDollarSign} label="Invoices" value={invoicesData?.data?.total} color="bg-gradient-to-br from-primary-500 to-primary-600" link={`${basePath}/invoices`} />
+        <StatCard icon={FiUsers} label="Total Users" value={usersTotal} color="bg-gradient-to-br from-blue-500 to-blue-600" link={`${basePath}/users`} />
+        <StatCard icon={FiMapPin} label="Branches" value={branchesTotal} color="bg-gradient-to-br from-purple-500 to-purple-600" link={`${basePath}/branches`} />
+        <StatCard icon={FiUserCheck} label="Clients" value={clientsTotal} color="bg-gradient-to-br from-green-500 to-green-600" link={`${basePath}/clients`} />
+        <StatCard icon={FiFileText} label="Test Orders" value={ordersTotal} color="bg-gradient-to-br from-orange-500 to-orange-600" link={`${basePath}/orders`} />
+        <StatCard icon={FiActivity} label="Lab Reports" value={reportsTotal} color="bg-gradient-to-br from-red-500 to-red-600" link={`${basePath}/reports`} />
+        <StatCard icon={FiDollarSign} label="Invoices" value={invoicesTotal} color="bg-gradient-to-br from-primary-500 to-primary-600" link={`${basePath}/invoices`} />
       </div>
 
       {/* Recent Activity */}

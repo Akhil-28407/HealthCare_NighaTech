@@ -17,7 +17,9 @@ export class ClientsController {
   @Post()
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.EMPLOYEE, Role.LAB, Role.LAB_EMP)
   @ApiOperation({ summary: 'Create client' })
-  create(@Body() dto: any) { return this.clientsService.create(dto); }
+  create(@Body() dto: any, @CurrentUser() user: any) { 
+    return this.clientsService.create(dto, user); 
+  }
 
   @Get()
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.EMPLOYEE, Role.LAB, Role.LAB_EMP)
@@ -26,18 +28,31 @@ export class ClientsController {
     return this.clientsService.findAll(query, user); 
   }
 
+  @Get('search-by-mobile')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.EMPLOYEE, Role.LAB, Role.LAB_EMP)
+  @ApiOperation({ summary: 'Search clients by exact mobile number' })
+  searchByMobile(@Query('mobile') mobile: string) {
+    return this.clientsService.searchByMobile(mobile);
+  }
+
   @Get(':id')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.EMPLOYEE, Role.LAB, Role.LAB_EMP)
   @ApiOperation({ summary: 'Get client by ID' })
-  findById(@Param('id') id: string) { return this.clientsService.findById(id); }
+  findById(@Param('id') id: string, @CurrentUser() user: any) { 
+    return this.clientsService.findById(id, user); 
+  }
 
   @Patch(':id')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.EMPLOYEE, Role.LAB, Role.LAB_EMP)
   @ApiOperation({ summary: 'Update client' })
-  update(@Param('id') id: string, @Body() dto: any) { return this.clientsService.update(id, dto); }
+  update(@Param('id') id: string, @Body() dto: any, @CurrentUser() user: any) { 
+    return this.clientsService.update(id, dto, user); 
+  }
 
   @Delete(':id')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.LAB, Role.LAB_EMP)
   @ApiOperation({ summary: 'Delete client' })
-  delete(@Param('id') id: string) { return this.clientsService.delete(id); }
+  delete(@Param('id') id: string, @CurrentUser() user: any) { 
+    return this.clientsService.delete(id, user); 
+  }
 }

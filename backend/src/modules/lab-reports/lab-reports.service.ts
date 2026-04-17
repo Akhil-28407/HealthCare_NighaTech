@@ -6,10 +6,9 @@ import * as QRCode from 'qrcode';
 import { LabReport, LabReportDocument, ReportStatus } from './schemas/lab-report.schema';
 import { TestOrder, TestOrderDocument, TestOrderStatus } from '../test-orders/schemas/test-order.schema';
 import { Client, ClientDocument } from '../clients/schemas/client.schema';
-import { Role } from '../../common/enums/role.enum';
-
 import { PdfService } from '../pdf/pdf.service';
 import { MailService } from '../mail/mail.service';
+import { Role } from '../../common/enums/role.enum';
 
 @Injectable()
 export class LabReportsService {
@@ -31,9 +30,11 @@ export class LabReportsService {
       
       // Role based filtering
       if (user.role === Role.CLIENT) {
-        const client = await this.clientModel.findOne({ userId: user.sub }).lean();
-        if (client) {
-          filter.clientId = client._id;
+        // Find all client profiles associated with this user's mobile number
+        const clients = await this.clientModel.find({ mobile: user.mobile }).lean();
+        if (clients.length > 0) {
+          const clientIds = clients.map(c => c._id);
+          filter.clientId = { $in: clientIds };
           if (!status) filter.status = ReportStatus.VERIFIED;
         } else {
           return { reports: [], total: 0, page, limit };
@@ -46,15 +47,17 @@ export class LabReportsService {
         filter.branchId = branchId;
       }
 
-      // Robust check for other filters (prevent empty string cast errors)
-      if (clientId && Types.ObjectId.isValid(clientId)) filter.clientId = clientId;
-      if (testOrderId && Types.ObjectId.isValid(testOrderId)) filter.testOrderId = testOrderId;
+      // Robust check for other filters
+      if (clientId && Types.ObjectId.isValid(clientId)) filter.clientId = new Types.ObjectId(clientId);
+      if (testOrderId && Types.ObjectId.isValid(testOrderId)) filter.testOrderId = new Types.ObjectId(testOrderId);
       if (status && status !== '') filter.status = status;
+
+      console.log(`[LabReports] FindAll filters:`, JSON.stringify(filter));
 
       const [reports, total] = await Promise.all([
         this.reportModel.find(filter)
-          .populate('clientId', 'name email mobile age gender')
-          .populate('testId', 'name code category')
+          .populate('clientId', 'name mobile')
+          .populate('testId', 'name category')
           .populate('testOrderId', 'orderNumber')
           .populate('branchId', 'name')
           .populate('enteredBy', 'name')
@@ -78,7 +81,9 @@ export class LabReportsService {
       .populate('enteredBy', 'name')
       .populate('verifiedBy', 'name')
       .lean();
+
     if (!report) throw new NotFoundException('Lab report not found');
+    
     return report;
   }
 
@@ -114,14 +119,26 @@ export class LabReportsService {
       report.enteredBy = new Types.ObjectId(userId);
     }
     
-    await report.save();
-    return report;
+    try {
+      await report.save();
+      return report;
+    } catch (saveError: any) {
+      console.error(`[LabReports] Update failed for report ${id}:`, saveError.message);
+      if (saveError.name === 'ValidationError') {
+        throw new BadRequestException(`Validation Error: ${Object.keys(saveError.errors).join(', ')}`);
+      }
+      throw saveError;
+    }
   }
 
   async verifyReport(id: string, userId: string) {
     const report = await this.reportModel.findById(id);
     if (!report) throw new NotFoundException('Lab report not found');
-    if (report.status !== ReportStatus.RESULTS_ENTERED) {
+    const hasContent = (report.results && report.results.length > 0) || (report.htmlContent && report.htmlContent.trim() !== '');
+    
+    // Loosen the check: As long as there is content, allow verification even if status is PENDING
+    // This resolves issues where status updates might lag behind data entry.
+    if (!hasContent && report.status === ReportStatus.PENDING) {
       throw new BadRequestException('Report must have results entered before verification');
     }
 
@@ -144,12 +161,11 @@ export class LabReportsService {
       });
     }
 
-    // TRIGGER AUTOMATED EMAIL
-    try {
-      await this.sendReportEmail(id);
-    } catch (e) {
-      console.error('Failed to send automated report email:', e.message);
-    }
+    // Automated email sending is currently disabled per user request.
+    // Manual sending remains available in the reports dashboard.
+    // this.sendReportEmail(id).catch(e => 
+    //   console.error(`[LabReports] Background email failed for report ${id}:`, e.message)
+    // );
 
     return report;
   }

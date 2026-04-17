@@ -18,29 +18,32 @@ export class TemplatesController {
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.LAB)
   @ApiOperation({ summary: 'Create template' })
   create(@Body() dto: any, @CurrentUser() user: any) { 
-    if (user.role === Role.LAB) dto.branchId = user.branchId;
-    return this.service.create(dto); 
+    return this.service.create(dto, user); 
   }
 
   @Get()
   @ApiOperation({ summary: 'Get all templates' })
-  findAll(@Query() query: any, @CurrentUser() user: any) { return this.service.findAll(query, user); }
+  findAll(@Query() query: any, @CurrentUser() user: any) { 
+    return this.service.findAll(query, user); 
+  }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get template by ID' })
-  findById(@Param('id') id: string) { return this.service.findById(id); }
+  findById(@Param('id') id: string) { 
+    return this.service.findById(id); 
+  }
 
   @Patch(':id')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.LAB)
   @ApiOperation({ summary: 'Update template' })
-  update(@Param('id') id: string, @Body() dto: any, @CurrentUser() user: any) { 
-    return this.service.update(id, dto, user); 
+  update(@Param('id') id: string, @Body() dto: any) { 
+    return this.service.update(id, dto); 
   }
 
   @Delete(':id')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.LAB)
   @ApiOperation({ summary: 'Delete template' })
-  delete(@Param('id') id: string, @CurrentUser() user: any) { return this.service.delete(id, user); }
+  delete(@Param('id') id: string) { return this.service.delete(id); }
 
   @Post(':id/preview')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.LAB)

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useAuthStore } from '../stores/auth.store';
+import toast from 'react-hot-toast';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
@@ -33,12 +34,20 @@ api.interceptors.response.use(
           useAuthStore.getState().setTokens(data.accessToken, data.refreshToken);
           originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
           return api(originalRequest);
-        } catch (refreshError) {
+        } catch (refreshError: any) {
+          const message = refreshError.response?.data?.message || '';
+          if (message.includes('inactive') || message.includes('disabled')) {
+            toast.error(message);
+          }
           useAuthStore.getState().logout();
           window.location.href = '/login';
           return Promise.reject(refreshError);
         }
       } else {
+        const message = error.response?.data?.message || '';
+        if (message.includes('inactive') || message.includes('disabled')) {
+          toast.error(message);
+        }
         useAuthStore.getState().logout();
         window.location.href = '/login';
       }

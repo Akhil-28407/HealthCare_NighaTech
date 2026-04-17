@@ -16,5 +16,7 @@ export class AuditLogController {
   @Get()
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @ApiOperation({ summary: 'Get audit logs' })
-  findAll(@Query() query: any) { return this.service.findAll(query); }
+  findAll(@Query() query: any) { 
+    return this.service.findAll(query); 
+  }
 }

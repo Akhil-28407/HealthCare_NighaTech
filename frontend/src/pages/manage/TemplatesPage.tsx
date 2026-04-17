@@ -1,12 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { templatesApi } from '../../api';
+import { authApi, templatesApi } from '../../api';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { FiPlus, FiSave, FiEye } from 'react-icons/fi';
 import Editor from '@monaco-editor/react';
+import { useAuthStore } from '../../stores/auth.store';
+import { Role } from '../../types';
 
 export default function TemplatesPage() {
   const queryClient = useQueryClient();
+  const { user: currentUser, updateUser } = useAuthStore();
+  const [isSyncing, setIsSyncing] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [content, setContent] = useState('');
@@ -14,6 +18,8 @@ export default function TemplatesPage() {
   const [type, setType] = useState('lab_report');
   const [previewHtml, setPreviewHtml] = useState('');
   const [showCreate, setShowCreate] = useState(false);
+
+  const isBranchPending = currentUser?.role === Role.LAB && !currentUser.branchId;
 
   const { data } = useQuery({ queryKey: ['templates'], queryFn: () => templatesApi.getAll() });
 
@@ -57,17 +63,58 @@ export default function TemplatesPage() {
     }
   };
 
+  const handleSyncStatus = async () => {
+    setIsSyncing(true);
+    try {
+      const { data: profile } = await authApi.getMe();
+      if (profile?.data) {
+        updateUser(profile.data);
+        if (profile.data.branchId) {
+          toast.success('Approval status synced! Templates unlocked.');
+        } else {
+          toast.error('Branch still pending approval.');
+        }
+      }
+    } catch {
+      toast.error('Failed to sync status');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Report Templates</h1>
         <button
           onClick={() => setShowCreate(!showCreate)}
-          className="btn-primary flex items-center gap-2"
+          className={`btn-primary flex items-center gap-2 ${isBranchPending ? 'opacity-50 cursor-not-allowed' : ''}`}
+          disabled={isBranchPending}
+          title={isBranchPending ? 'Wait for branch approval to manage templates' : ''}
         >
           <FiPlus /> {showCreate ? 'Close Editor' : 'New Template'}
         </button>
       </div>
+
+      {isBranchPending && (
+        <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 p-4 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-yellow-500/20 rounded-full text-lg">⚠️</div>
+            <div>
+              <p className="font-bold text-yellow-500/80">Branch Pending Approval</p>
+              <p className="text-sm opacity-80 text-yellow-500/60">Your laboratory profile is being reviewed. You will be able to manage your custom templates once it is approved.</p>
+            </div>
+          </div>
+          <button 
+            onClick={handleSyncStatus} 
+            disabled={isSyncing}
+            className="flex items-center gap-2 px-4 py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-500 rounded-xl text-sm font-semibold transition-all border border-yellow-500/30"
+          >
+            <FiPlus className={isSyncing ? 'animate-spin' : ''} />
+            Check Approval Status
+          </button>
+        </div>
+      )}
 
       {showCreate && (
         <div className="glass-card p-6 space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
@@ -176,8 +223,9 @@ export default function TemplatesPage() {
                   </button>
                   <button
                     onClick={() => updateMutation.mutate({ id: selectedId, data: { name, content, type } })}
-                    className="btn-sm bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30 flex items-center gap-2 px-6"
-                    title="Save Changes"
+                    className={`btn-sm flex items-center gap-2 px-6 ${isBranchPending ? 'opacity-50 cursor-not-allowed bg-surface-800' : 'bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30'}`}
+                    disabled={isBranchPending}
+                    title={isBranchPending ? 'Wait for branch approval to save changes' : 'Save Changes'}
                   >
                     <FiSave size={14} /> Save Changes
                   </button>

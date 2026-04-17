@@ -20,6 +20,7 @@ import { PdfModule } from './modules/pdf/pdf.module';
 import { MailModule } from './modules/mail/mail.module';
 import { SmsModule } from './modules/sms/sms.module';
 import { SeedModule } from './modules/seed/seed.module';
+import { UploadModule } from './modules/upload/upload.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { SeedModule } from './modules/seed/seed.module';
     MailModule,
     SmsModule,
     SeedModule,
+    UploadModule,
   ],
 })
 export class AppModule {}

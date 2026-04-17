@@ -9,7 +9,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { ConfigService } from '@nestjs/config';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { User, UserDocument } from '../users/schemas/user.schema';
@@ -18,6 +18,7 @@ import { Session, SessionDocument } from '../sessions/schemas/session.schema';
 import { OtpStoreService } from './otp-store.service';
 import { MailService } from '../mail/mail.service';
 import { SmsService } from '../sms/sms.service';
+import { Branch, BranchDocument, BranchStatus } from '../branches/schemas/branch.schema';
 import { Role } from '../../common/enums/role.enum';
 import {
   SendOtpDto,
@@ -27,6 +28,7 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
   RefreshTokenDto,
+  RegisterVendorDto,
 } from './dto/auth.dto';
 
 @Injectable()
@@ -37,6 +39,7 @@ export class AuthService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Session.name) private sessionModel: Model<SessionDocument>,
     @InjectModel(Client.name) private clientModel: Model<ClientDocument>,
+    @InjectModel(Branch.name) private branchModel: Model<BranchDocument>,
     private jwtService: JwtService,
     private configService: ConfigService,
     private otpStore: OtpStoreService,
@@ -108,6 +111,10 @@ export class AuthService {
       });
     }
 
+    if (!user.isActive) {
+      throw new UnauthorizedException('Account is disabled');
+    }
+
     // Generate tokens
     return this.generateTokensAndSession(user, ip, dto.deviceInfo);
   }
@@ -141,6 +148,92 @@ export class AuthService {
       success: true,
       message: 'Registration successful',
       userId: user._id,
+    };
+  }
+
+  async registerVendor(dto: RegisterVendorDto) {
+    const existingUser = await this.userModel.findOne({ email: dto.email });
+    if (existingUser) {
+      throw new ConflictException('Email already registered');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.password, 12);
+
+    // 1. Create User with role LAB
+    const user = await this.userModel.create({
+      name: dto.labName,
+      email: dto.email,
+      password: hashedPassword,
+      mobile: dto.phone,
+      role: Role.LAB,
+      isActive: false, // Wait for admin approval
+    });
+
+    // 2. Create Branch with status PENDING
+    const branch = await this.branchModel.create({
+      name: dto.labName,
+      labName: dto.labName,
+      address: dto.address,
+      city: dto.city,
+      state: dto.state,
+      pincode: dto.pincode,
+      phone: dto.phone,
+      email: dto.email,
+      labLicense: dto.labLicense,
+      gstNumber: dto.gstNumber,
+      contactPersonNumber: dto.contactPersonNumber,
+      websiteUrl: dto.websiteUrl,
+      logoUrl: dto.logoUrl,
+      status: BranchStatus.PENDING,
+      requestedBy: user._id,
+    });
+
+    // Update user with branchId
+    user.branchId = new Types.ObjectId(branch._id.toString());
+    await (user as any).save();
+
+    return {
+      success: true,
+      message: 'Vendor registration submitted. Please wait for admin approval.',
+      userId: user._id,
+      branchId: branch._id,
+    };
+  }
+
+  async createLab(dto: any) {
+    const existingUser = await this.userModel.findOne({ email: dto.email });
+    if (existingUser) {
+      throw new ConflictException('Email already registered');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.password || 'Welcome@123', 12);
+
+    // 1. Create User with role LAB and isActive: true
+    const user = await this.userModel.create({
+      name: dto.labName,
+      email: dto.email,
+      password: hashedPassword,
+      mobile: dto.phone,
+      role: Role.LAB,
+      isActive: true,
+    });
+
+    // 2. Create Branch with status APPROVED
+    const branch = await this.branchModel.create({
+      ...dto,
+      status: BranchStatus.APPROVED,
+      requestedBy: user._id,
+    });
+
+    // Update user with branchId
+    user.branchId = new Types.ObjectId(branch._id.toString());
+    await (user as any).save();
+
+    return {
+      success: true,
+      message: 'Lab created and approved successfully',
+      userId: user._id,
+      branchId: branch._id,
     };
   }
 
@@ -275,6 +368,28 @@ export class AuthService {
     }
   }
 
+  async impersonate(targetUserId: string, ip: string) {
+    if (!targetUserId || targetUserId === 'undefined') {
+      throw new BadRequestException('Target user ID is required');
+    }
+    
+    const targetUser = await this.userModel.findById(targetUserId);
+    if (!targetUser) {
+      throw new NotFoundException('Target user not found');
+    }
+
+    if (![Role.LAB, Role.LAB_EMP].includes(targetUser.role as Role)) {
+      throw new BadRequestException('You can only impersonate lab accounts');
+    }
+
+    if (!targetUser.isActive) {
+      throw new BadRequestException('Target user account is inactive');
+    }
+
+    // Generate tokens for the target user
+    return this.generateTokensAndSession(targetUser, ip, 'Impersonated Session');
+  }
+
   async logout(userId: string, sessionId: string, accessToken: string) {
     if (sessionId) {
       await this.sessionModel.findOneAndUpdate(
@@ -365,12 +480,12 @@ export class AuthService {
 
   private sanitizeUser(user: any) {
     return {
-      _id: user._id,
+      _id: user._id.toString(),
       name: user.name,
       email: user.email,
       mobile: user.mobile,
       role: user.role,
-      branchId: user.branchId,
+      branchId: user.branchId?.toString(),
       isActive: user.isActive,
     };
   }

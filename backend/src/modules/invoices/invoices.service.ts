@@ -1,12 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ConfigService } from '@nestjs/config';
-import { Model, Types } from 'mongoose';
+import { Types, Model } from 'mongoose';
+import { Role } from '../../common/enums/role.enum';
 import { Invoice, InvoiceDocument, InvoiceStatus } from './schemas/invoice.schema';
 import { Client, ClientDocument } from '../clients/schemas/client.schema';
 import { CounterService } from '../counter/counter.service';
 import { MailService } from '../mail/mail.service';
-import { Role } from '../../common/enums/role.enum';
 
 @Injectable()
 export class InvoicesService {
@@ -19,6 +19,10 @@ export class InvoicesService {
   ) {}
 
   async create(dto: any) {
+    if (!dto.clientId || !Types.ObjectId.isValid(dto.clientId)) {
+      throw new BadRequestException('Valid clientId is required');
+    }
+
     const invoiceNumber = await this.counterService.generateNumber('INV', 'invoice');
     const items = (dto.items || []).map(item => ({
       ...item,
@@ -38,14 +42,26 @@ export class InvoicesService {
 
   async findAll(query: any = {}, user?: any) {
     const { page = 1, limit = 20, status, clientId, branchId } = query;
-    const filter: any = {};
-    
-    // Role-based branch isolation
-    if (user && (user.role === 'LAB' || user.role === 'LAB_EMP')) {
-      if (user.branchId && Types.ObjectId.isValid(user.branchId)) {
-        filter.branchId = user.branchId;
+    const filter: any = { clientId: { $type: 'objectId' } };
+
+    if (user) {
+      if (user.role === Role.CLIENT) {
+        // Find all client profiles associated with this user's mobile number
+        const clients = await this.clientModel.find({ mobile: user.mobile }).lean();
+        if (clients.length > 0) {
+          const clientIds = clients.map(c => c._id);
+          filter.clientId = { $in: clientIds };
+        } else {
+          return { invoices: [], total: 0, page: Number(page), limit: Number(limit) };
+        }
+      } else if (user.role === Role.LAB || user.role === Role.LAB_EMP) {
+        if (user.branchId && Types.ObjectId.isValid(user.branchId)) {
+          filter.branchId = user.branchId;
+        }
       }
-    } else if (branchId && Types.ObjectId.isValid(branchId)) {
+    }
+
+    if (branchId && Types.ObjectId.isValid(branchId)) {
       filter.branchId = branchId;
     }
 
@@ -77,7 +93,7 @@ export class InvoicesService {
 
     const client = invoice.clientId as any;
     if (client?.email) {
-      const viewUrl = `${this.configService.get('app.frontendUrl')}/invoices/${id}`;
+        const viewUrl = `${this.configService.get('app.frontendUrl')}/invoices/${id}`;
       await this.mailService.sendInvoice(client.email, client.name, invoice.invoiceNumber, viewUrl);
     }
 

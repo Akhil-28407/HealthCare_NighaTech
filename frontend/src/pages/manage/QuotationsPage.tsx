@@ -2,10 +2,13 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { quotationsApi, clientsApi } from '../../api';
 import toast from 'react-hot-toast';
-import { FiPlus, FiSend, FiRefreshCw } from 'react-icons/fi';
+import { FiPlus, FiSend, FiRefreshCw, FiEye, FiDownload } from 'react-icons/fi';
+import { useNavigate } from 'react-router-dom';
+
 
 export default function QuotationsPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ clientId: '', items: [{ name: '', quantity: 1, unitPrice: 0, description: '' }], tax: 0, discount: 0, notes: '' });
 
@@ -18,6 +21,14 @@ export default function QuotationsPage() {
 
   const addItem = () => setForm(f => ({ ...f, items: [...f.items, { name: '', quantity: 1, unitPrice: 0, description: '' }] }));
   const updateItem = (i: number, field: string, val: any) => { const items = [...form.items]; (items[i] as any)[field] = val; setForm({ ...form, items }); };
+
+  const downloadPdf = async (id: string, num: string) => {
+    try {
+      const { data } = await quotationsApi.downloadPdf(id);
+      const url = URL.createObjectURL(new Blob([data]));
+      const a = document.createElement('a'); a.href = url; a.download = `quotation-${num}.pdf`; a.click();
+    } catch { toast.error('Download failed'); }
+  };
 
   return (
     <div className="space-y-6">
@@ -60,8 +71,10 @@ export default function QuotationsPage() {
               <td className="text-primary-400 font-semibold">₹{q.total}</td>
               <td><span className={`badge ${q.status === 'CONVERTED' ? 'badge-success' : q.status === 'SENT' ? 'badge-info' : 'badge-warning'}`}>{q.status}</span></td>
               <td><div className="flex items-center gap-2">
-                {q.status === 'DRAFT' && <button onClick={() => sendMutation.mutate(q._id)} className="text-blue-400" title="Send"><FiSend size={15} /></button>}
-                {q.status !== 'CONVERTED' && <button onClick={() => convertMutation.mutate(q._id)} className="text-green-400" title="Convert"><FiRefreshCw size={15} /></button>}
+                {q.status === 'DRAFT' && <button onClick={() => sendMutation.mutate(q._id)} className="text-blue-400" title="Send Email"><FiSend size={15} /></button>}
+                {q.status !== 'CONVERTED' && <button onClick={() => convertMutation.mutate(q._id)} className="text-green-400" title="Convert to Invoice"><FiRefreshCw size={15} /></button>}
+                <button onClick={() => navigate(`/quotations/${q._id}`)} className="text-primary-400" title="View"><FiEye size={15} /></button>
+                <button onClick={() => downloadPdf(q._id, q.quotationNumber)} className="text-green-400" title="Download PDF"><FiDownload size={15} /></button>
               </div></td>
             </tr>
           ))}

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ConfigService } from '@nestjs/config';
 import { Model, Types } from 'mongoose';
@@ -7,7 +7,6 @@ import { Invoice, InvoiceDocument } from '../invoices/schemas/invoice.schema';
 import { Client, ClientDocument } from '../clients/schemas/client.schema';
 import { CounterService } from '../counter/counter.service';
 import { MailService } from '../mail/mail.service';
-import { Role } from '../../common/enums/role.enum';
 
 @Injectable()
 export class QuotationsService {
@@ -21,6 +20,10 @@ export class QuotationsService {
   ) {}
 
   async create(dto: any) {
+    if (!dto.clientId || !Types.ObjectId.isValid(dto.clientId)) {
+      throw new BadRequestException('Valid clientId is required');
+    }
+
     const quotationNumber = await this.counterService.generateNumber('QUO', 'quotation');
     const items = (dto.items || []).map(item => ({
       ...item,
@@ -32,16 +35,10 @@ export class QuotationsService {
     return this.quotationModel.create({ ...dto, quotationNumber, items, subtotal, total });
   }
 
-  async findAll(query: any = {}, user?: any) {
+  async findAll(query: any = {}) {
     const { page = 1, limit = 20, status, clientId, branchId } = query;
-    const filter: any = {};
-    
-    // Role-based branch isolation
-    if (user && (user.role === Role.LAB || user.role === 'LAB_EMP')) {
-      if (user.branchId && Types.ObjectId.isValid(user.branchId)) {
-        filter.branchId = user.branchId;
-      }
-    } else if (branchId && Types.ObjectId.isValid(branchId)) {
+    const filter: any = { clientId: { $type: 'objectId' } };
+    if (branchId && Types.ObjectId.isValid(branchId)) {
       filter.branchId = branchId;
     }
 
@@ -51,6 +48,7 @@ export class QuotationsService {
     const [quotations, total] = await Promise.all([
       this.quotationModel.find(filter)
         .populate('clientId', 'name email mobile')
+        .populate('branchId', 'name')
         .skip((page - 1) * limit).limit(limit).sort({ createdAt: -1 }).lean(),
       this.quotationModel.countDocuments(filter),
     ]);

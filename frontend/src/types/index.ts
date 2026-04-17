@@ -1,3 +1,13 @@
+export enum Role {
+  SUPER_ADMIN = 'SUPER_ADMIN',
+  ADMIN = 'ADMIN',
+  EMPLOYEE = 'EMPLOYEE',
+  LAB = 'LAB',
+  LAB_EMP = 'LAB_EMP',
+  CLIENT = 'CLIENT',
+}
+
+
 export interface User {
   _id: string;
   name: string;
@@ -7,15 +17,6 @@ export interface User {
   branchId?: string | Branch;
   isActive: boolean;
   createdAt: string;
-}
-
-export enum Role {
-  SUPER_ADMIN = 'SUPER_ADMIN',
-  ADMIN = 'ADMIN',
-  EMPLOYEE = 'EMPLOYEE',
-  LAB = 'LAB',
-  LAB_EMP = 'LAB_EMP',
-  CLIENT = 'CLIENT',
 }
 
 export interface Branch {
@@ -177,6 +178,7 @@ export interface AuditLogEntry {
   createdAt: string;
 }
 
+
 export interface PaginatedResponse<T> {
   total: number;
   page: number;
@@ -190,3 +192,4 @@ export interface AuthResponse {
   refreshToken: string;
   user: User;
 }
+

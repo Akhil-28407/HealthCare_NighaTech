@@ -9,7 +9,9 @@ import { Role } from '../../common/enums/role.enum';
 export class SeedService implements OnModuleInit {
   private readonly logger = new Logger(SeedService.name);
 
-  constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
+  constructor(
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+  ) {}
 
   async onModuleInit() {
     await this.seedSuperAdmin();
@@ -36,6 +38,40 @@ export class SeedService implements OnModuleInit {
     if (orderResults.modifiedCount > 0) {
       this.logger.log(`Cleaned ${orderResults.modifiedCount} malformed TestOrders.`);
     }
+
+    // Clean empty clientId refs that break populate (Client._id $in [""])
+    const reportClientResults = await this.userModel.db.collection('labreports').updateMany(
+      { clientId: "" },
+      { $unset: { clientId: "" } }
+    );
+    if (reportClientResults.modifiedCount > 0) {
+      this.logger.log(`Cleaned ${reportClientResults.modifiedCount} malformed LabReports clientId refs.`);
+    }
+
+    const orderClientResults = await this.userModel.db.collection('testorders').updateMany(
+      { clientId: "" },
+      { $unset: { clientId: "" } }
+    );
+    if (orderClientResults.modifiedCount > 0) {
+      this.logger.log(`Cleaned ${orderClientResults.modifiedCount} malformed TestOrders clientId refs.`);
+    }
+
+    const invoiceClientResults = await this.userModel.db.collection('invoices').updateMany(
+      { clientId: "" },
+      { $unset: { clientId: "" } }
+    );
+    if (invoiceClientResults.modifiedCount > 0) {
+      this.logger.log(`Cleaned ${invoiceClientResults.modifiedCount} malformed Invoices clientId refs.`);
+    }
+
+    const quotationClientResults = await this.userModel.db.collection('quotations').updateMany(
+      { clientId: "" },
+      { $unset: { clientId: "" } }
+    );
+    if (quotationClientResults.modifiedCount > 0) {
+      this.logger.log(`Cleaned ${quotationClientResults.modifiedCount} malformed Quotations clientId refs.`);
+    }
+
   }
 
   private async seedSuperAdmin() {

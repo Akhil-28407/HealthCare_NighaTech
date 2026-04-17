@@ -25,4 +25,9 @@ export default registerAs('app', () => ({
     route: process.env.SMS_ROUTE || 'TA',
     msgType: process.env.SMS_MSG_TYPE || '1',
   },
+  cloudinary: {
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME || '',
+    apiKey: process.env.CLOUDINARY_API_KEY || '',
+    api_secret: process.env.CLOUDINARY_API_SECRET || '',
+  },
 }));

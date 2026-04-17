@@ -10,6 +10,7 @@ import { OtpStoreService } from './otp-store.service';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { Session, SessionSchema } from '../sessions/schemas/session.schema';
 import { Client, ClientSchema } from '../clients/schemas/client.schema';
+import { Branch, BranchSchema } from '../branches/schemas/branch.schema';
 import { MailModule } from '../mail/mail.module';
 import { SmsModule } from '../sms/sms.module';
 
@@ -28,6 +29,7 @@ import { SmsModule } from '../sms/sms.module';
       { name: User.name, schema: UserSchema },
       { name: Session.name, schema: SessionSchema },
       { name: Client.name, schema: ClientSchema },
+      { name: Branch.name, schema: BranchSchema },
     ]),
     MailModule,
     SmsModule,

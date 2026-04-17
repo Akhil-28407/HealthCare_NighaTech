@@ -1,30 +1,60 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { labReportsApi } from '../../api';
-import { useNavigate } from 'react-router-dom';
+import { branchesApi, labReportsApi } from '../../api';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { FiEye, FiEdit3, FiCheckCircle, FiDownload, FiMail } from 'react-icons/fi';
+import { 
+  FiEye, FiEdit3, FiCheckCircle, FiDownload, FiMail, 
+  FiClock, FiActivity, FiAlertCircle, FiSearch, FiFilter, FiFileText 
+} from 'react-icons/fi';
 import { useAuthStore } from '../../stores/auth.store';
 import { Role } from '../../types';
 
 export default function LabReportsPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedBranchId = searchParams.get('branchId') || '';
+  const testOrderId = searchParams.get('testOrderId') || '';
   const [editingId, setEditingId] = useState<string | null>(null);
   const [results, setResults] = useState<any[]>([]);
   const [htmlContent, setHtmlContent] = useState('');
   const [showHtmlEditor, setShowHtmlEditor] = useState(false);
   const { user } = useAuthStore();
+  const handledRef = useRef<string | null>(null);
   
   const canManage = [Role.ADMIN, Role.SUPER_ADMIN, Role.LAB, Role.LAB_EMP].includes(user?.role as Role);
   const canVerify = [Role.ADMIN, Role.SUPER_ADMIN, Role.LAB, Role.LAB_EMP].includes(user?.role as Role);
+  const isAdminScope = [Role.SUPER_ADMIN, Role.ADMIN].includes(user?.role as Role);
 
-  const { data, isLoading } = useQuery({ queryKey: ['lab-reports'], queryFn: () => labReportsApi.getAll() });
+  const { data, isLoading } = useQuery({
+    queryKey: ['lab-reports', selectedBranchId, testOrderId],
+    queryFn: () => labReportsApi.getAll({ 
+      ...(selectedBranchId ? { branchId: selectedBranchId } : {}),
+      ...(testOrderId ? { testOrderId } : {}),
+      limit: 100 // Allow more for direct management
+    }),
+  });
+
+  const { data: branchesData } = useQuery({
+    queryKey: ['branches-for-reports-filter'],
+    queryFn: () => branchesApi.getAll({ limit: 200, status: 'APPROVED' }),
+    enabled: isAdminScope,
+  });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, results, htmlContent }: any) => labReportsApi.updateResults(id, results, htmlContent),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['lab-reports'] }); toast.success('Results saved'); setEditingId(null); },
-    onError: (err: any) => toast.error(err.response?.data?.message || 'Failed'),
+    mutationFn: ({ id, results, htmlContent }: any) => {
+      // Cleanup results before sending to prevent 400 validation errors
+      const validResults = results.filter((r: any) => r.name && r.name.trim() !== '');
+      return labReportsApi.updateResults(id, validResults, htmlContent);
+    },
+    onSuccess: () => { 
+      queryClient.invalidateQueries({ queryKey: ['lab-reports'] }); 
+      toast.success('Report saved successfully'); 
+      setEditingId(null);
+      clearOrderIdParam();
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Failed to save report'),
   });
 
   const verifyMutation = useMutation({
@@ -49,8 +79,67 @@ export default function LabReportsPage() {
     setShowHtmlEditor(!!report.htmlContent);
   };
 
+  // Auto-edit logic for deep links
+  useEffect(() => {
+    const reports = data?.data?.reports || [];
+    
+    if (testOrderId && testOrderId !== handledRef.current && reports.length > 0 && !editingId && !isLoading) {
+      const pendingReport = reports.find((r: any) => {
+        const orderIdOnReport = String(r.testOrderId?._id || r.testOrderId).toLowerCase().trim();
+        const urlId = testOrderId.toLowerCase().trim();
+        const matchesOrder = orderIdOnReport === urlId;
+        const isPending = r.status === 'PENDING' || r.status === 'RESULTS_ENTERED';
+        return matchesOrder && isPending;
+      });
+
+      if (pendingReport) {
+        handledRef.current = testOrderId;
+        startEdit(pendingReport);
+      }
+    }
+  }, [testOrderId, data, editingId, isLoading]);
+
+  const forceOpenFirstPending = () => {
+    const reports = data?.data?.reports || [];
+    const first = reports.find((r: any) => r.status === 'PENDING' || r.status === 'RESULTS_ENTERED');
+    if (first) {
+      handledRef.current = testOrderId || first.testOrderId;
+      startEdit(first);
+    } else {
+      toast.error('No pending reports found in the current list');
+    }
+  };
+
+  const addResultRow = () => {
+    setResults(prev => [...prev, { name: '', unit: '', value: '', flag: 'N', normalRangeText: '' }]);
+  };
+
+  const removeResultRow = (index: number) => {
+    setResults(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const clearOrderIdParam = () => {
+    if (testOrderId) {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('testOrderId');
+      setSearchParams(newParams, { replace: true });
+    }
+    handledRef.current = null;
+  };
+
   const updateResultValue = (index: number, value: string) => {
-    setResults(prev => prev.map((r, i) => i === index ? { ...r, value } : r));
+    setResults(prev => prev.map((r, i) => {
+      if (i !== index) return r;
+      
+      let flag = 'N';
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue)) {
+        if (r.normalRangeMin != null && numValue < r.normalRangeMin) flag = 'L';
+        else if (r.normalRangeMax != null && numValue > r.normalRangeMax) flag = 'H';
+      }
+      
+      return { ...r, value, flag };
+    }));
   };
 
   const downloadPdf = async (id: string, reportNumber: string) => {
@@ -65,91 +154,243 @@ export default function LabReportsPage() {
     } catch { toast.error('Download failed'); }
   };
 
+  const reports = data?.data?.reports || [];
+  const stats = {
+    pending: reports.filter((r: any) => r.status === 'PENDING').length,
+    entered: reports.filter((r: any) => r.status === 'RESULTS_ENTERED').length,
+    verified: reports.filter((r: any) => r.status === 'VERIFIED').length,
+    total: data?.data?.total || 0
+  };
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-white">Lab Reports Management</h1>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Lab Reports Management</h1>
+          <p className="text-surface-400 text-sm">Monitor and manage clinical test results</p>
+        </div>
+      </div>
 
-      {editingId && (
-        <div className="glass-card p-6 space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-white">Entry & Live Preview</h3>
-            <div className="flex gap-2">
-              <button 
-                onClick={() => setShowHtmlEditor(!showHtmlEditor)} 
-                className={`btn-sm ${showHtmlEditor ? 'btn-primary' : 'btn-secondary'}`}
-              >
-                {showHtmlEditor ? 'Disable HTML' : 'Enable HTML / Paste HTML'}
-              </button>
+      {/* Optimization: Dashboard Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="glass-card p-4 border-l-4 border-orange-500 bg-orange-500/5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-orange-500/20 rounded-lg text-orange-500"><FiClock /></div>
+            <div>
+              <p className="text-xs text-surface-400 font-medium uppercase tracking-wider">Pending</p>
+              <p className="text-xl font-bold text-white">{stats.pending}</p>
             </div>
           </div>
-
-          {/* Result Preview on Top */}
-          <div className="bg-white rounded-lg p-6 text-black min-h-[100px] overflow-auto">
-            <h4 className="text-center font-bold border-bottom-2 border-primary mb-4">PREVIEW</h4>
-            {results.length > 0 && !showHtmlEditor && (
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="bg-primary text-white">
-                    <th className="p-2 border">Parameter</th>
-                    <th className="p-2 border">Value</th>
-                    <th className="p-2 border">Unit</th>
-                    <th className="p-2 border">Range</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {results.map((r, i) => (
-                    <tr key={i} className="border-b">
-                      <td className="p-2 border">{r.name}</td>
-                      <td className="p-2 border font-bold">{r.value || '—'}</td>
-                      <td className="p-2 border">{r.unit}</td>
-                      <td className="p-2 border text-xs">{r.normalRangeText || `${r.normalRangeMin ?? ''} - ${r.normalRangeMax ?? ''}`}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-            {showHtmlEditor && htmlContent && (
-              <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
-            )}
+        </div>
+        <div className="glass-card p-4 border-l-4 border-blue-500 bg-blue-500/5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-500/20 rounded-lg text-blue-500"><FiActivity /></div>
+            <div>
+              <p className="text-xs text-surface-400 font-medium uppercase tracking-wider">Awaiting Verification</p>
+              <p className="text-xl font-bold text-white">{stats.entered}</p>
+            </div>
           </div>
+        </div>
+        <div className="glass-card p-4 border-l-4 border-green-500 bg-green-500/5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-green-500/20 rounded-lg text-green-500"><FiCheckCircle /></div>
+            <div>
+              <p className="text-xs text-surface-400 font-medium uppercase tracking-wider">Verified</p>
+              <p className="text-xl font-bold text-white">{stats.verified}</p>
+            </div>
+          </div>
+        </div>
+        <div className="glass-card p-4 border-l-4 border-primary bg-primary/5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/20 rounded-lg text-primary"><FiFileText /></div>
+            <div>
+              <p className="text-xs text-surface-400 font-medium uppercase tracking-wider">Total Reports</p>
+              <p className="text-xl font-bold text-white">{stats.total}</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {!showHtmlEditor && (
-              <div className="space-y-4">
-                <h4 className="text-surface-300 text-sm font-medium">Standard Parameters</h4>
-                <div className="table-container">
-                  <table className="w-full">
-                    <thead><tr className="text-left text-xs text-surface-400"><th>Parameter</th><th>Value</th><th>Unit</th></tr></thead>
-                    <tbody>
-                      {results.map((r, i) => (
-                        <tr key={i}>
-                          <td className="py-2 text-sm text-white">{r.name}</td>
-                          <td><input type="text" value={r.value || ''} onChange={(e) => updateResultValue(i, e.target.value)} className="input-field py-1" /></td>
-                          <td className="text-xs">{r.unit}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+      {testOrderId && (
+        <div className="glass-card p-4 border border-primary/30 bg-primary/10 flex items-center justify-between animate-in fade-in slide-in-from-top-4">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary animate-pulse">
+              <FiSearch size={20} />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-primary-400 uppercase tracking-widest">Focused Entry Mode</p>
+              <p className="text-sm text-white">
+                Viewing results for order: <span className="font-mono text-primary-300 ml-1">{testOrderId}</span>
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {!editingId && (
+              <button 
+                onClick={forceOpenFirstPending}
+                className="btn-sm btn-primary flex items-center gap-2"
+              >
+                <FiActivity size={14} /> Open Form
+              </button>
+            )}
+            <button 
+              onClick={clearOrderIdParam}
+              className="btn-sm btn-secondary"
+            >
+              Exit Focus
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isAdminScope && (
+        <div className="glass-card p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+          <label className="text-sm text-surface-300">Filter by Lab Branch</label>
+          <select
+            value={selectedBranchId}
+            onChange={(e) => {
+              const next = e.target.value;
+              setSearchParams(next ? { branchId: next } : {});
+            }}
+            className="input-field sm:max-w-sm"
+          >
+            <option value="">All branches</option>
+            {branchesData?.data?.branches?.map((b: any) => (
+              <option key={b._id} value={b._id}>{b.labName || b.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {editingId && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-surface-950/80 backdrop-blur-sm p-4 md:p-8">
+          <div className="max-w-4xl mx-auto glass-card shadow-2xl transition-all duration-300">
+            {/* Direct Entry Header */}
+            <div className="p-6 border-b border-surface-700 bg-surface-900/50 flex items-center justify-between sticky top-0 z-10">
+              <div>
+                <h2 className="text-xl font-bold text-white">Direct Entry Dashboard</h2>
+                <p className="text-xs text-surface-400 mt-1 uppercase tracking-widest font-bold">Report Number: {reports.find((r: any) => r._id === editingId)?.reportNumber}</p>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => updateMutation.mutate({ id: editingId, results, htmlContent })} className="btn-primary px-6">Save & Sync</button>
+                <button onClick={() => { setEditingId(null); clearOrderIdParam(); }} className="btn-secondary">Cancel</button>
+              </div>
+            </div>
+
+            <div className="p-8 space-y-8 bg-white min-h-[600px] text-gray-900">
+              {/* Internal Report View */}
+              <div className="flex justify-between items-center border-b-2 border-primary-600 pb-4">
+                <div>
+                  <h3 className="text-2xl font-bold text-primary-700">{user?.branchId?.labName || 'NighaTech Healthcare Lab'}</h3>
+                  <p className="text-xs text-gray-500">{user?.branchId?.address}</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs font-bold uppercase text-gray-400">Date Generated</div>
+                  <div className="text-sm font-semibold">{new Date().toLocaleDateString()}</div>
                 </div>
               </div>
-            )}
 
-            {showHtmlEditor && (
-              <div className="space-y-4">
-                <h4 className="text-surface-300 text-sm font-medium">Custom HTML / Rich Content</h4>
-                <textarea 
-                  value={htmlContent} 
-                  onChange={(e) => setHtmlContent(e.target.value)} 
-                  className="input-field h-64 font-mono text-sm"
-                  placeholder="Paste your HTML code here..."
-                />
+              {/* Patient Banner */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-primary-50 p-4 rounded-lg text-sm border border-primary-100">
+                <div><span className="text-primary-700 font-bold block text-[10px] uppercase">Patient</span> {reports.find((r: any) => r._id === editingId)?.clientId?.name || '—'}</div>
+                <div><span className="text-primary-700 font-bold block text-[10px] uppercase">Age/Gender</span> {reports.find((r: any) => r._id === editingId)?.clientId?.age || '—'} / {reports.find((r: any) => r._id === editingId)?.clientId?.gender || '—'}</div>
+                <div><span className="text-primary-700 font-bold block text-[10px] uppercase">Order ID</span> {reports.find((r: any) => r._id === editingId)?.testOrderId?.orderNumber || '—'}</div>
+                <div><span className="text-primary-700 font-bold block text-[10px] uppercase">Test Name</span> {reports.find((r: any) => r._id === editingId)?.testId?.name || '—'}</div>
               </div>
-            )}
-          </div>
 
-          <div className="flex gap-3 pt-4 border-t border-surface-700">
-            <button onClick={() => updateMutation.mutate({ id: editingId, results: showHtmlEditor ? [] : results, htmlContent })} className="btn-primary">Save Results</button>
-            <button onClick={() => setEditingId(null)} className="btn-secondary">Cancel</button>
+              {/* Results Table - Direct Entry */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-end">
+                  <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wider">Test Parameters & Results</h4>
+                  <button onClick={addResultRow} className="text-xs font-bold text-primary-600 hover:text-primary-700">+ Add Custom Parameter</button>
+                </div>
+                
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-100 text-gray-600">
+                    <tr>
+                      <th className="py-2 px-3 text-left">Parameter</th>
+                      <th className="py-2 px-3 text-left">Result / Value</th>
+                      <th className="py-2 px-3 text-left">Unit</th>
+                      <th className="py-2 px-3 text-left">Reference Range</th>
+                      <th className="py-2 px-3"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {results.map((r, i) => (
+                      <tr key={i} className="border-b border-gray-100 group">
+                        <td className="py-3 px-3">
+                          <input 
+                            type="text" 
+                            value={r.name} 
+                            placeholder="Parameter" 
+                            onChange={(e) => setResults(prev => prev.map((item, idx) => idx === i ? { ...item, name: e.target.value } : item))} 
+                            className="w-full border-none focus:ring-0 font-medium p-0 text-gray-700"
+                          />
+                        </td>
+                        <td className="py-3 px-3">
+                          <div className="flex items-center gap-2">
+                            <input 
+                              type="text" 
+                              value={r.value} 
+                              placeholder="0.0" 
+                              onChange={(e) => updateResultValue(i, e.target.value)} 
+                              className={`w-24 border border-gray-200 rounded px-2 py-1 text-center font-bold outline-none focus:border-primary-500 transition-colors ${r.flag === 'H' ? 'text-red-600 bg-red-50' : r.flag === 'L' ? 'text-blue-600 bg-blue-50' : 'text-green-600 bg-green-50'}`} 
+                            />
+                            {r.flag === 'H' && <span className="text-red-600 font-bold text-xs">↑ High</span>}
+                            {r.flag === 'L' && <span className="text-blue-600 font-bold text-xs">↓ Low</span>}
+                          </div>
+                        </td>
+                        <td className="py-3 px-3">
+                          <input 
+                            type="text" 
+                            value={r.unit} 
+                            placeholder="Unit" 
+                            onChange={(e) => setResults(prev => prev.map((item, idx) => idx === i ? { ...item, unit: e.target.value } : item))} 
+                            className="bg-transparent border-none focus:ring-0 p-0 text-gray-500 text-xs italic"
+                          />
+                        </td>
+                        <td className="py-3 px-3 text-xs text-gray-400 font-mono">
+                          {r.normalRangeText || `${r.normalRangeMin || '—'} - ${r.normalRangeMax || '—'}`}
+                        </td>
+                        <td className="py-3 px-3 text-right opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => removeResultRow(i)} className="text-red-300 hover:text-red-500">×</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Advanced / HTML Section */}
+              <div className="pt-8 border-t border-gray-100 flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-400 uppercase">Interpretation / Notes (Optional)</span>
+                  <button 
+                    onClick={() => setShowHtmlEditor(!showHtmlEditor)} 
+                    className="text-[10px] text-primary-500 font-bold uppercase tracking-widest"
+                  >
+                    {showHtmlEditor ? 'Hide Advanced Editor' : 'Enable Advanced Entry / HTML'}
+                  </button>
+                </div>
+                {showHtmlEditor && (
+                  <div className="animate-in fade-in duration-500">
+                    <p className="text-[10px] text-gray-400 mb-2">Use this section for complex report descriptions or pasting formatted interpretations.</p>
+                    <textarea 
+                      value={htmlContent} 
+                      onChange={(e) => setHtmlContent(e.target.value)}
+                      placeholder="Enter results interpretations or paste HTML content..."
+                      className="w-full h-32 p-3 bg-gray-50 border border-gray-200 rounded-md text-sm font-mono text-gray-700"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-12 flex justify-between items-center text-[10px] text-gray-400 italic" style={{ userSelect: 'none' }}>
+                <span>Technician Signature: _________________</span>
+                <span>Generated by NighaTech Health Intelligence</span>
+                <span>Pathologist Signature: _________________</span>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -183,7 +424,14 @@ export default function LabReportsPage() {
                       <>
                         <button onClick={() => startEdit(report)} className="text-blue-400 hover:text-blue-300" title="Edit Results"><FiEdit3 size={16} /></button>
                         {canVerify && (
-                          <button onClick={() => verifyMutation.mutate(report._id)} className="text-green-400 hover:text-green-300" title="Verify"><FiCheckCircle size={16} /></button>
+                          <button 
+                            onClick={() => verifyMutation.mutate(report._id)} 
+                            className={`text-green-400 hover:text-green-300 transition-all ${verifyMutation.isPending ? 'opacity-50 cursor-wait animate-pulse text-green-200' : ''}`} 
+                            disabled={verifyMutation.isPending}
+                            title={verifyMutation.isPending ? 'Verifying...' : 'Verify'}
+                          >
+                            <FiCheckCircle size={16} />
+                          </button>
                         )}
                       </>
                     )}

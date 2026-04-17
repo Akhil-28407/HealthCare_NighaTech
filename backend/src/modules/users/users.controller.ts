@@ -22,10 +22,10 @@ export class UsersController {
   }
 
   @Get()
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.LAB)
   @ApiOperation({ summary: 'Get all users' })
-  findAll(@Query() query: any) {
-    return this.usersService.findAll(query);
+  findAll(@Query() query: any, @CurrentUser() user: any) {
+    return this.usersService.findAll(query, user);
   }
 
   @Get(':id')

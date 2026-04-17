@@ -21,6 +21,9 @@ export class UsersService {
 
       // LAB can only create LAB_EMP for their own branch
       if (creatorRole === 'LAB') {
+        if (!creatorBranchId) {
+          throw new ConflictException('Your lab profile must be approved before managing employees');
+        }
         if (targetRole !== 'LAB_EMP') {
           throw new ConflictException('Lab role can only create Lab Employee accounts');
         }
@@ -46,12 +49,22 @@ export class UsersService {
     return this.userModel.create(createUserDto);
   }
 
-  async findAll(query: any = {}) {
+  async findAll(query: any = {}, currentUser?: any) {
     const { page = 1, limit = 20, role, branchId, search } = query;
     const filter: any = {};
 
-    if (role) filter.role = role;
-    if (branchId) filter.branchId = branchId;
+    if (currentUser?.role === 'LAB') {
+      if (!currentUser.branchId) {
+        // Return clear state or throw if preferred. Returning empty list but indicating status is better.
+        return { users: [], total: 0, page: Number(page), limit: Number(limit), error: 'Branch not approved' };
+      }
+
+      filter.branchId = currentUser.branchId;
+      filter.role = 'LAB_EMP';
+    }
+
+    if (role && currentUser?.role !== 'LAB') filter.role = role;
+    if (branchId && currentUser?.role !== 'LAB') filter.branchId = branchId;
     if (search) {
       filter.$or = [
         { name: { $regex: search, $options: 'i' } },
@@ -76,14 +89,14 @@ export class UsersService {
   }
 
   async findById(id: string) {
-    const user = await this.userModel
+    const targetUser = await this.userModel
       .findById(id)
       .select('-password -resetPasswordToken -resetPasswordExpires')
       .populate('branchId', 'name')
       .lean();
 
-    if (!user) throw new NotFoundException('User not found');
-    return user;
+    if (!targetUser) throw new NotFoundException('User not found');
+    return targetUser;
   }
 
   async update(id: string, updateDto: any) {
@@ -91,18 +104,18 @@ export class UsersService {
       updateDto.password = await bcrypt.hash(updateDto.password, 12);
     }
 
-    const user = await this.userModel
+    const updatedUser = await this.userModel
       .findByIdAndUpdate(id, updateDto, { new: true })
       .select('-password -resetPasswordToken -resetPasswordExpires')
       .lean();
 
-    if (!user) throw new NotFoundException('User not found');
-    return user;
+    if (!updatedUser) throw new NotFoundException('User not found');
+    return updatedUser;
   }
 
   async delete(id: string) {
-    const user = await this.userModel.findByIdAndDelete(id);
-    if (!user) throw new NotFoundException('User not found');
+    const targetUser = await this.userModel.findByIdAndDelete(id);
+    if (!targetUser) throw new NotFoundException('User not found');
     return { success: true, message: 'User deleted successfully' };
   }
 }

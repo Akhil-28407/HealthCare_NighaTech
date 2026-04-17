@@ -10,21 +10,31 @@ export class TemplatesService {
     @InjectModel(ReportTemplate.name) private templateModel: Model<ReportTemplateDocument>,
   ) {}
 
-  async create(dto: any) { return this.templateModel.create(dto); }
+  async create(dto: any, user?: any) {
+    const data = { ...dto };
+    if (user?.role === 'LAB' && user.branchId) {
+      data.branchId = user.branchId;
+    }
+    return this.templateModel.create(data);
+  }
 
   async findAll(query: any = {}, user?: any) {
     const { type } = query;
     const filter: any = { isActive: true };
     if (type) filter.type = type;
 
-    if (user && user.role === 'LAB') {
+    if (user?.role === 'LAB') {
       filter.$or = [
         { branchId: user.branchId },
-        { branchId: { $exists: false } },
+        { branchId: null },
+      ];
+    } else if (user?.role === 'LAB_EMP') {
+      filter.$or = [
+        { branchId: user.branchId },
         { branchId: null },
       ];
     }
-    
+
     return this.templateModel.find(filter).sort({ isDefault: -1, createdAt: -1 }).lean();
   }
 
@@ -34,25 +44,17 @@ export class TemplatesService {
     return template;
   }
 
-  async update(id: string, dto: any, user?: any) {
+  async update(id: string, dto: any) {
     const template = await this.templateModel.findById(id);
     if (!template) throw new NotFoundException('Template not found');
-
-    if (user && user.role === 'LAB' && template.branchId?.toString() !== user.branchId.toString()) {
-      throw new NotFoundException('You can only update your own branch templates');
-    }
 
     Object.assign(template, dto);
     return template.save();
   }
 
-  async delete(id: string, user?: any) {
+  async delete(id: string) {
     const template = await this.templateModel.findById(id);
     if (!template) throw new NotFoundException('Template not found');
-
-    if (user && user.role === 'LAB' && template.branchId?.toString() !== user.branchId.toString()) {
-      throw new NotFoundException('You can only delete your own branch templates');
-    }
 
     template.isActive = false;
     await template.save();
@@ -60,7 +62,7 @@ export class TemplatesService {
   }
 
   async preview(id: string, data: any) {
-    const template = await this.templateModel.findById(id);
+    const template = await this.findById(id);
     if (!template) throw new NotFoundException('Template not found');
 
     Handlebars.registerHelper('eq', (a, b) => a === b);

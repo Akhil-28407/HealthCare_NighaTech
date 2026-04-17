@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { testMasterApi } from '../../api';
+import { branchesApi, testMasterApi } from '../../api';
 import toast from 'react-hot-toast';
 import { FiPlus, FiEdit2, FiTrash2, FiX } from 'react-icons/fi';
 import { useAuthStore } from '../../stores/auth.store';
@@ -9,9 +10,12 @@ import { Role } from '../../types';
 export default function TestCatalogPage() {
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuthStore();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedBranchId = searchParams.get('branchId') || '';
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
+    branchId: '',
     name: '',
     code: '',
     category: '',
@@ -23,11 +27,24 @@ export default function TestCatalogPage() {
   });
 
   const canManage = [Role.SUPER_ADMIN, Role.ADMIN, Role.LAB, Role.LAB_EMP].includes(currentUser?.role as Role);
+  const isAdminScope = [Role.SUPER_ADMIN, Role.ADMIN].includes(currentUser?.role as Role);
 
   const { data, isLoading } = useQuery({ 
-    queryKey: ['test-master'], 
-    queryFn: () => testMasterApi.getAll({ limit: 100 }) 
+    queryKey: ['test-master', selectedBranchId], 
+    queryFn: () => testMasterApi.getAll({ limit: 100, ...(selectedBranchId ? { branchId: selectedBranchId } : {}) }),
   });
+
+  const { data: branchesData } = useQuery({
+    queryKey: ['branches-for-test-catalog-filter'],
+    queryFn: () => branchesApi.getAll({ limit: 200, status: 'APPROVED' }),
+    enabled: isAdminScope,
+  });
+
+  useEffect(() => {
+    if (isAdminScope && selectedBranchId) {
+      setForm((prev) => ({ ...prev, branchId: selectedBranchId }));
+    }
+  }, [selectedBranchId, isAdminScope]);
 
   const createMutation = useMutation({
     mutationFn: (d: any) => testMasterApi.create(d),
@@ -57,7 +74,17 @@ export default function TestCatalogPage() {
   });
 
   const resetForm = () => {
-    setForm({ name: '', code: '', category: '', description: '', sampleType: '', price: 0, turnaroundTime: '', parameters: [] });
+    setForm({
+      branchId: isAdminScope ? selectedBranchId : '',
+      name: '',
+      code: '',
+      category: '',
+      description: '',
+      sampleType: '',
+      price: 0,
+      turnaroundTime: '',
+      parameters: [],
+    });
   };
 
   const addParameter = () => {
@@ -73,6 +100,7 @@ export default function TestCatalogPage() {
   const startEdit = (test: any) => {
     setEditingId(test._id);
     setForm({
+      branchId: test.branchId?._id || test.branchId || '',
       name: test.name,
       code: test.code,
       category: test.category || '',
@@ -96,10 +124,40 @@ export default function TestCatalogPage() {
         )}
       </div>
 
+      {isAdminScope && (
+        <div className="glass-card p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+          <label className="text-sm text-surface-300">Filter by Lab Branch</label>
+          <select
+            value={selectedBranchId}
+            onChange={(e) => {
+              const next = e.target.value;
+              setSearchParams(next ? { branchId: next } : {});
+            }}
+            className="input-field sm:max-w-sm"
+          >
+            <option value="">All branches</option>
+            {branchesData?.data?.branches?.map((b: any) => (
+              <option key={b._id} value={b._id}>{b.labName || b.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {showForm && (
         <div className="glass-card p-6 space-y-6">
           <h2 className="text-lg font-semibold text-white">{editingId ? 'Edit Test' : 'New Test Registration'}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {isAdminScope && (
+              <div>
+                <label className="label">Lab Branch</label>
+                <select value={form.branchId} onChange={(e) => setForm({ ...form, branchId: e.target.value })} className="input-field">
+                  <option value="">Select branch</option>
+                  {branchesData?.data?.branches?.map((b: any) => (
+                    <option key={b._id} value={b._id}>{b.labName || b.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div><label className="label">Test Name</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field" placeholder="e.g. CBC" /></div>
             <div><label className="label">Code</label><input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} className="input-field" placeholder="e.g. T-001" /></div>
             <div><label className="label">Category</label><input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="input-field" placeholder="Hematology" /></div>
@@ -127,7 +185,11 @@ export default function TestCatalogPage() {
           </div>
 
           <div className="flex gap-3">
-            <button onClick={() => editingId ? updateMutation.mutate({ id: editingId, data: form }) : createMutation.mutate(form)} className="btn-primary">
+            <button
+              onClick={() => editingId ? updateMutation.mutate({ id: editingId, data: form }) : createMutation.mutate(form)}
+              disabled={isAdminScope && !form.branchId}
+              className="btn-primary"
+            >
               {editingId ? 'Update Test' : 'Add to Catalog'}
             </button>
             <button onClick={() => { setShowForm(false); resetForm(); setEditingId(null); }} className="btn-secondary">Cancel</button>

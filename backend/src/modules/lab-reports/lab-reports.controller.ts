@@ -27,7 +27,9 @@ export class LabReportsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get lab report by ID (public for verified reports)' })
-  findById(@Param('id') id: string) { return this.service.findById(id); }
+  findById(@Param('id') id: string) { 
+    return this.service.findById(id); 
+  }
 
   @Get(':id/pdf')
   @ApiOperation({ summary: 'Download lab report as PDF' })

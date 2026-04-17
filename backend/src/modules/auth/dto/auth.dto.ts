@@ -89,3 +89,70 @@ export class RefreshTokenDto {
   @IsNotEmpty()
   refreshToken: string;
 }
+
+export class RegisterVendorDto {
+  @ApiProperty({ example: 'NighaTech Labs' })
+  @IsString()
+  @IsNotEmpty()
+  labName: string;
+
+  @ApiProperty({ example: 'Sector 5, Gurgaon' })
+  @IsString()
+  @IsNotEmpty()
+  address: string;
+
+  @ApiProperty({ example: 'Gurgaon' })
+  @IsString()
+  @IsNotEmpty()
+  city: string;
+
+  @ApiProperty({ example: 'Haryana' })
+  @IsString()
+  @IsNotEmpty()
+  state: string;
+
+  @ApiProperty({ example: '122001' })
+  @IsString()
+  @IsNotEmpty()
+  pincode: string;
+
+  @ApiProperty({ example: 'lab@example.com' })
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+
+  @ApiProperty({ example: '9876543210' })
+  @IsString()
+  @IsNotEmpty()
+  phone: string;
+
+  @ApiProperty({ example: 'password123' })
+  @IsString()
+  @MinLength(6)
+  password: string;
+
+  @ApiProperty({ example: '29AAAAA0000A1Z5' })
+  @IsString()
+  @IsNotEmpty()
+  gstNumber: string;
+
+  @ApiProperty({ example: 'LIC123456' })
+  @IsString()
+  @IsNotEmpty()
+  labLicense: string;
+
+  @ApiProperty({ example: '9999999999' })
+  @IsString()
+  @IsNotEmpty()
+  contactPersonNumber: string;
+
+  @ApiProperty({ example: 'https://lab.com', required: false })
+  @IsOptional()
+  @IsString()
+  websiteUrl?: string;
+
+  @ApiProperty({ example: 'https://res.cloudinary.com/...', required: false })
+  @IsOptional()
+  @IsString()
+  logoUrl?: string;
+}

@@ -3,7 +3,7 @@ import { useAuthStore } from '../../stores/auth.store';
 import { Role } from '../../types';
 import {
   FiHome, FiUsers, FiMapPin, FiUserCheck, FiClipboard, FiFileText,
-  FiDollarSign, FiFile, FiLayout, FiActivity, FiLogOut, FiMenu, FiX, FiShield
+  FiDollarSign, FiFile, FiLayout, FiActivity, FiLogOut, FiMenu, FiX, FiShield, FiClock,
 } from 'react-icons/fi';
 import { useState } from 'react';
 
@@ -12,6 +12,7 @@ const menuItems: Record<string, { label: string; icon: any; path: string }[]> = 
     { label: 'Dashboard', icon: FiHome, path: '/superadmin/dashboard' },
     { label: 'Users', icon: FiUsers, path: '/superadmin/users' },
     { label: 'Branches', icon: FiMapPin, path: '/superadmin/branches' },
+    { label: 'Lab Requests', icon: FiClock, path: '/superadmin/branch-requests' },
     { label: 'Clients', icon: FiUserCheck, path: '/superadmin/clients' },
     { label: 'Test Catalog', icon: FiClipboard, path: '/superadmin/tests' },
     { label: 'Test Orders', icon: FiFileText, path: '/superadmin/orders' },
@@ -42,10 +43,13 @@ const menuItems: Record<string, { label: string; icon: any; path: string }[]> = 
   ],
   [Role.LAB]: [
     { label: 'Dashboard', icon: FiHome, path: '/lab/dashboard' },
+    { label: 'Lab Employees', icon: FiUsers, path: '/lab/users' },
+    { label: 'Branch Request', icon: FiMapPin, path: '/lab/branches' },
     { label: 'Patients', icon: FiUserCheck, path: '/lab/clients' },
     { label: 'Test Orders', icon: FiFileText, path: '/lab/orders' },
     { label: 'Lab Reports', icon: FiActivity, path: '/lab/reports' },
     { label: 'Test Catalog', icon: FiClipboard, path: '/lab/tests' },
+    { label: 'Templates', icon: FiLayout, path: '/lab/templates' },
   ],
   [Role.LAB_EMP]: [
     { label: 'Dashboard', icon: FiHome, path: '/labemp/dashboard' },

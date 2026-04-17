@@ -13,6 +13,7 @@ import LoginPage from './pages/auth/LoginPage';
 import OtpLoginPage from './pages/auth/OtpLoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+import RegisterVendorPage from './pages/auth/RegisterVendorPage';
 
 // Dashboards
 import AdminDashboard from './pages/dashboard/AdminDashboard';
@@ -31,9 +32,13 @@ import InvoicesPage from './pages/manage/InvoicesPage';
 import QuotationsPage from './pages/manage/QuotationsPage';
 import TemplatesPage from './pages/manage/TemplatesPage';
 import AuditLogsPage from './pages/manage/AuditLogsPage';
+import BranchRequestsPage from './pages/manage/BranchRequestsPage';
 
 // Public Pages
 import ReportViewPage from './pages/reports/ReportViewPage';
+import InvoiceViewPage from './pages/invoices/InvoiceViewPage';
+import QuotationViewPage from './pages/quotations/QuotationViewPage';
+
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -42,8 +47,8 @@ const queryClient = new QueryClient({
 });
 
 function HomeRedirect() {
-  const { user, isAuthenticated } = useAuthStore();
-  if (!isAuthenticated) return <Navigate to="/login" />;
+  const { user, isAuthenticated, accessToken } = useAuthStore();
+  if (!isAuthenticated || !accessToken || !user) return <Navigate to="/login" />;
   const routes: Record<string, string> = {
     SUPER_ADMIN: '/superadmin/dashboard',
     ADMIN: '/admin/dashboard',
@@ -76,8 +81,12 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/otp-login" element={<OtpLoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/register-vendor" element={<RegisterVendorPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reports/:id" element={<ReportViewPage />} />
+          <Route path="/invoices/:id" element={<InvoiceViewPage />} />
+          <Route path="/quotations/:id" element={<QuotationViewPage />} />
+
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
           {/* Home Redirect */}
@@ -89,6 +98,7 @@ export default function App() {
               <Route path="/superadmin/dashboard" element={<AdminDashboard />} />
               <Route path="/superadmin/users" element={<UsersPage />} />
               <Route path="/superadmin/branches" element={<BranchesPage />} />
+              <Route path="/superadmin/branch-requests" element={<BranchRequestsPage />} />
               <Route path="/superadmin/clients" element={<ClientsPage />} />
               <Route path="/superadmin/tests" element={<TestCatalogPage />} />
               <Route path="/superadmin/orders" element={<TestOrdersPage />} />
@@ -131,10 +141,13 @@ export default function App() {
           <Route element={<ProtectedRoute allowedRoles={[Role.LAB]} />}>
             <Route element={<DashboardLayout />}>
               <Route path="/lab/dashboard" element={<LabDashboard />} />
+              <Route path="/lab/users" element={<UsersPage />} />
+              <Route path="/lab/branches" element={<BranchesPage />} />
               <Route path="/lab/clients" element={<ClientsPage />} />
               <Route path="/lab/orders" element={<TestOrdersPage />} />
               <Route path="/lab/reports" element={<LabReportsPage />} />
               <Route path="/lab/tests" element={<TestCatalogPage />} />
+              <Route path="/lab/templates" element={<TemplatesPage />} />
             </Route>
           </Route>
 

@@ -7,13 +7,13 @@ interface Props {
 }
 
 export default function ProtectedRoute({ allowedRoles }: Props) {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, accessToken, user } = useAuthStore();
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !accessToken || !user) {
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && user && !allowedRoles.includes(user.role)) {
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to="/unauthorized" replace />;
   }
 

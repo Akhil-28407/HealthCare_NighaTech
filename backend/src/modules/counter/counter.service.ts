@@ -18,7 +18,7 @@ export class CounterService {
     return counter.seq;
   }
 
-  async generateNumber(prefix: string, entity: string): Promise<string> {
+  async generateNumber(prefix: string, entity: string, vendorId?: string): Promise<string> {
     const year = new Date().getFullYear();
     const key = `${entity}-${year}`;
     const seq = await this.getNextSequence(key);

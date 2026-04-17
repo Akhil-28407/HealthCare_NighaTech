@@ -7,6 +7,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Role } from '../../common/enums/role.enum';
 import { BranchStatus } from './schemas/branch.schema';
+import { BranchUpdateRequestStatus } from './schemas/branch-update.schema';
 
 @ApiTags('Branches')
 @Controller('branches')
@@ -16,19 +17,42 @@ export class BranchesController {
   constructor(private readonly branchesService: BranchesService) {}
 
   @Post()
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.EMPLOYEE, Role.LAB, Role.LAB_EMP)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.EMPLOYEE, Role.LAB)
   @ApiOperation({ summary: 'Create branch' })
   create(@Body() dto: any, @CurrentUser() user: any) { 
     return this.branchesService.create(dto, user); 
   }
 
+  @Get('update-requests')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @ApiOperation({ summary: 'Get all pending branch update requests' })
+  findAllUpdateRequests(@Query() query: any) {
+    return this.branchesService.findAllUpdateRequests(query);
+  }
+
+  @Post('update-requests/:id/process')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @ApiOperation({ summary: 'Process a branch update request (Approve/Reject)' })
+  processUpdateRequest(
+    @Param('id') id: string,
+    @Body('status') status: BranchUpdateRequestStatus,
+    @Body('rejectionReason') rejectionReason: string,
+    @CurrentUser('sub') processorId: string,
+  ) {
+    return this.branchesService.processUpdateRequest(id, status, processorId, rejectionReason);
+  }
+
   @Get()
   @ApiOperation({ summary: 'Get all branches' })
-  findAll(@Query() query: any) { return this.branchesService.findAll(query); }
+  findAll(@Query() query: any, @CurrentUser() user: any) { 
+    return this.branchesService.findAll(query, user); 
+  }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get branch by ID' })
-  findById(@Param('id') id: string) { return this.branchesService.findById(id); }
+  findById(@Param('id') id: string, @CurrentUser() user: any) { 
+    return this.branchesService.findById(id, user); 
+  }
 
   @Patch(':id')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.LAB)
@@ -47,5 +71,7 @@ export class BranchesController {
   @Delete(':id')
   @Roles(Role.SUPER_ADMIN)
   @ApiOperation({ summary: 'Delete branch' })
-  delete(@Param('id') id: string) { return this.branchesService.delete(id); }
+  delete(@Param('id') id: string) { 
+    return this.branchesService.delete(id); 
+  }
 }

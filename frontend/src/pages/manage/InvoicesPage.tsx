@@ -2,10 +2,13 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { invoicesApi, clientsApi } from '../../api';
 import toast from 'react-hot-toast';
-import { FiPlus, FiSend, FiCheck, FiDownload } from 'react-icons/fi';
+import { FiPlus, FiSend, FiCheck, FiDownload, FiEye } from 'react-icons/fi';
+import { useNavigate } from 'react-router-dom';
+
 
 export default function InvoicesPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ clientId: '', items: [{ name: '', quantity: 1, unitPrice: 0, description: '' }], tax: 0, discount: 0, notes: '' });
 
@@ -80,9 +83,10 @@ export default function InvoicesPage() {
               <td className="text-xs">{new Date(inv.createdAt).toLocaleDateString()}</td>
               <td>
                 <div className="flex items-center gap-2">
-                  {inv.status === 'DRAFT' && <button onClick={() => sendMutation.mutate(inv._id)} className="text-blue-400"><FiSend size={15} /></button>}
-                  {(inv.status === 'SENT' || inv.status === 'DRAFT') && <button onClick={() => paidMutation.mutate(inv._id)} className="text-green-400"><FiCheck size={15} /></button>}
-                  <button onClick={() => downloadPdf(inv._id, inv.invoiceNumber)} className="text-primary-400"><FiDownload size={15} /></button>
+                  {inv.status === 'DRAFT' && <button onClick={() => sendMutation.mutate(inv._id)} className="text-blue-400" title="Send Email"><FiSend size={15} /></button>}
+                  {(inv.status === 'SENT' || inv.status === 'DRAFT') && <button onClick={() => paidMutation.mutate(inv._id)} className="text-green-400" title="Mark Paid"><FiCheck size={15} /></button>}
+                  <button onClick={() => navigate(`/invoices/${inv._id}`)} className="text-primary-400" title="View"><FiEye size={15} /></button>
+                  <button onClick={() => downloadPdf(inv._id, inv.invoiceNumber)} className="text-green-400" title="Download PDF"><FiDownload size={15} /></button>
                 </div>
               </td>
             </tr>

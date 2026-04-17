@@ -15,7 +15,26 @@ export class TestOrdersService {
     private counterService: CounterService,
   ) {}
 
-  async create(dto: any, userId: string) {
+  async create(dto: any, user: any) {
+    if (!dto.clientId || !Types.ObjectId.isValid(dto.clientId)) {
+      throw new BadRequestException('Valid clientId is required');
+    }
+    dto.clientId = new Types.ObjectId(dto.clientId);
+
+    if (!Array.isArray(dto.tests) || dto.tests.length === 0) {
+      throw new BadRequestException('At least one test is required');
+    }
+
+    const validTestIds = dto.tests
+      .filter((id: string) => Types.ObjectId.isValid(id))
+      .map((id: string) => new Types.ObjectId(id));
+      
+    if (validTestIds.length !== dto.tests.length) {
+      throw new BadRequestException('One or more test IDs are invalid');
+    }
+
+    dto.tests = validTestIds;
+
     const orderNumber = await this.counterService.generateNumber('ORD', 'test-order');
 
     // Calculate total from tests
@@ -24,17 +43,26 @@ export class TestOrdersService {
     const discount = dto.discount || 0;
     const netAmount = totalAmount - discount;
 
-    const order = await this.orderModel.create({
+    const data: any = {
       ...dto,
       orderNumber,
-      orderedBy: userId,
+      orderedBy: user.sub,
       totalAmount,
       discount,
       netAmount,
       status: dto.autoCollect ? TestOrderStatus.COLLECTED : TestOrderStatus.ORDERED,
       sampleCollectedAt: dto.autoCollect ? new Date() : undefined,
-      collectedBy: dto.autoCollect ? new Types.ObjectId(userId) : undefined,
-    });
+      collectedBy: dto.autoCollect ? new Types.ObjectId(user.sub) : undefined,
+    };
+
+    if (user.role === 'LAB' || user.role === 'LAB_EMP') {
+      if (!user.branchId || !Types.ObjectId.isValid(user.branchId)) {
+        throw new BadRequestException('Your lab profile must be approved before creating test orders');
+      }
+      data.branchId = user.branchId;
+    }
+
+    const order = await this.orderModel.create(data);
 
     // Create lab reports for each test if autoCollect is true
     if (dto.autoCollect) {
@@ -72,9 +100,10 @@ export class TestOrdersService {
     
     // Role-based branch isolation
     if (user && (user.role === 'LAB' || user.role === 'LAB_EMP')) {
-      if (user.branchId && Types.ObjectId.isValid(user.branchId)) {
-        filter.branchId = user.branchId;
+      if (!user.branchId || !Types.ObjectId.isValid(user.branchId)) {
+        return { orders: [], total: 0, page, limit, error: 'Branch not approved' };
       }
+      filter.branchId = user.branchId;
     } else if (branchId && Types.ObjectId.isValid(branchId)) {
       filter.branchId = branchId;
     }
@@ -94,7 +123,7 @@ export class TestOrdersService {
     return { orders, total, page, limit };
   }
 
-  async findById(id: string) {
+  async findById(id: string, user?: any) {
     const order = await this.orderModel.findById(id)
       .populate('clientId', 'name email mobile age gender')
       .populate('tests', 'name code price parameters sampleType')
@@ -105,7 +134,7 @@ export class TestOrdersService {
     return order;
   }
 
-  async collectSample(id: string, userId: string) {
+  async collectSample(id: string, user: any) {
     const order = await this.orderModel.findById(id);
     if (!order) throw new NotFoundException('Test order not found');
     if (order.status !== TestOrderStatus.ORDERED) {
@@ -114,7 +143,7 @@ export class TestOrdersService {
 
     order.status = TestOrderStatus.COLLECTED;
     order.sampleCollectedAt = new Date();
-    order.collectedBy = new Types.ObjectId(userId);
+    order.collectedBy = new Types.ObjectId(user.sub);
     await order.save();
 
     // Create lab reports for each test
@@ -144,7 +173,7 @@ export class TestOrdersService {
     return order;
   }
 
-  async updateStatus(id: string, status: TestOrderStatus) {
+  async updateStatus(id: string, status: TestOrderStatus, user: any) {
     const order = await this.orderModel.findByIdAndUpdate(id, { status }, { new: true });
     if (!order) throw new NotFoundException('Test order not found');
     return order;

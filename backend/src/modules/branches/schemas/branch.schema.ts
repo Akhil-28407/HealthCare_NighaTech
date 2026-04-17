@@ -38,7 +38,19 @@ export class Branch {
   @Prop()
   labLicense: string;
 
-  @Prop({ type: String, enum: BranchStatus, default: BranchStatus.APPROVED })
+  @Prop({ trim: true })
+  gstNumber: string;
+
+  @Prop({ trim: true })
+  contactPersonNumber: string;
+
+  @Prop({ trim: true })
+  websiteUrl: string;
+
+  @Prop()
+  logoUrl: string;
+
+  @Prop({ type: String, enum: BranchStatus, default: BranchStatus.PENDING })
   status: BranchStatus;
 
   @Prop({ type: Types.ObjectId, ref: 'User' })

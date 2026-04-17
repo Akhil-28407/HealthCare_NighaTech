@@ -79,11 +79,12 @@ export const handler = async (req: any, res: any) => {
   } catch (error) {
     console.error('--- ❌ HANDLER FAILURE ---');
     console.error(error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
     if (!res.headersSent) {
       res.status(500).json({
         statusCode: 500,
         message: 'Internal Server Error during bootstrap',
-        error: error.message,
+        error: message,
         timestamp: new Date().toISOString()
       });
     }

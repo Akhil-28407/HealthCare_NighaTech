@@ -6,14 +6,18 @@ export const authApi = {
     api.post('/auth/verify-otp', { mobile, otp, deviceInfo }),
   register: (data: { name: string; email: string; password: string; mobile?: string }) =>
     api.post('/auth/register', data),
+  registerVendor: (data: any) => api.post('/auth/register-vendor', data),
   login: (email: string, password: string, deviceInfo?: string) =>
     api.post('/auth/login', { email, password, deviceInfo }),
   forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
+  impersonate: (userId: string) => api.post(`/auth/impersonate/${userId}`),
+  createLab: (data: any) => api.post('/auth/create-lab', data),
   resetPassword: (token: string, newPassword: string) =>
     api.post('/auth/reset-password', { token, newPassword }),
   refresh: (refreshToken: string) => api.post('/auth/refresh', { refreshToken }),
   logout: (sessionId?: string) => api.post('/auth/logout', { sessionId }),
   getSessions: () => api.get('/auth/sessions'),
+  getMe: () => api.get('/auth/me'),
   revokeSession: (id: string) => api.delete(`/auth/sessions/${id}`),
   revokeAllSessions: () => api.delete('/auth/sessions/all'),
 };
@@ -32,6 +36,9 @@ export const branchesApi = {
   create: (data: any) => api.post('/branches', data),
   update: (id: string, data: any) => api.patch(`/branches/${id}`, data),
   updateStatus: (id: string, status: string) => api.patch(`/branches/${id}/status`, { status }),
+  getUpdateRequests: (params?: any) => api.get('/branches/update-requests', { params }),
+  processUpdateRequest: (id: string, status: string, rejectionReason?: string) => 
+    api.post(`/branches/update-requests/${id}/process`, { status, rejectionReason }),
   delete: (id: string) => api.delete(`/branches/${id}`),
 };
 
@@ -39,6 +46,7 @@ export const clientsApi = {
   getAll: (params?: any) => api.get('/clients', { params }),
   getById: (id: string) => api.get(`/clients/${id}`),
   create: (data: any) => api.post('/clients', data),
+  searchByMobile: (mobile: string) => api.get('/clients/search-by-mobile', { params: { mobile } }),
   update: (id: string, data: any) => api.patch(`/clients/${id}`, data),
   delete: (id: string) => api.delete(`/clients/${id}`),
 };
@@ -100,4 +108,14 @@ export const templatesApi = {
 
 export const auditLogsApi = {
   getAll: (params?: any) => api.get('/audit-logs', { params }),
+};
+
+export const uploadApi = {
+  uploadImage: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/upload/image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };

@@ -22,6 +22,7 @@ export class ReportTemplate {
 
   @Prop({ default: true })
   isActive: boolean;
+
   @Prop({ type: Types.ObjectId, ref: 'Branch' })
   branchId: Types.ObjectId;
 }

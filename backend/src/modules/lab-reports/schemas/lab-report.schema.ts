@@ -78,3 +78,10 @@ export class LabReport {
 }
 
 export const LabReportSchema = SchemaFactory.createForClass(LabReport);
+
+// Performance Indexes
+LabReportSchema.index({ branchId: 1, status: 1 });
+LabReportSchema.index({ testOrderId: 1 });
+LabReportSchema.index({ clientId: 1, createdAt: -1 });
+LabReportSchema.index({ reportNumber: 1 }, { unique: true });
+LabReportSchema.index({ status: 1, createdAt: -1 });
