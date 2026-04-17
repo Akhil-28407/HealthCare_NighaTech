@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { authApi } from '../../api';
 import toast from 'react-hot-toast';
 import { 
-  FiActivity, FiMail, FiLock, FiPhone, FiMapPin, 
+  FiLock, FiPhone, FiMapPin, 
   FiBriefcase, FiGlobe, FiUploadCloud, FiCheckCircle,
   FiArrowRight, FiArrowLeft, FiInfo, FiShield
 } from 'react-icons/fi';

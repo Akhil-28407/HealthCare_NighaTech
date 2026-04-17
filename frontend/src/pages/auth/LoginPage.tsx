@@ -5,7 +5,7 @@ import { authApi } from '../../api';
 import toast from 'react-hot-toast';
 import { 
   FiActivity, FiMail, FiLock, FiEye, FiEyeOff, 
-  FiUser, FiShield, FiPlusCircle, FiPhone, FiArrowRight,
+  FiUser, FiShield, FiPhone, FiArrowRight,
   FiBriefcase
 } from 'react-icons/fi';
 
@@ -185,7 +185,7 @@ export default function LoginPage() {
               </div>
 
               <div className="flex justify-between items-center py-2">
-                <Link to="/forgot-password" size={14} className="text-sm font-semibold text-primary-400 hover:text-primary-300 transition-colors">
+                <Link to="/forgot-password" className="text-sm font-semibold text-primary-400 hover:text-primary-300 transition-colors">
                   Forgot password?
                 </Link>
               </div>
