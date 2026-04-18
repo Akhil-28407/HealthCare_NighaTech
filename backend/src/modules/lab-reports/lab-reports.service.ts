@@ -103,10 +103,18 @@ export class LabReportsService {
       const allInvoices = [...invoicesByOrder, ...invoicesByQuo];
       const invoiceMap = new Map();
       
-      // Preferred link is testOrderId
+      // Preferred link is testOrderId. We always keep the invoice with the highest paidAmount
+      const updateMap = (key: string, inv: any) => {
+        if (!key) return;
+        const existing = invoiceMap.get(key);
+        if (!existing || (inv.paidAmount || 0) > (existing.paidAmount || 0)) {
+          invoiceMap.set(key, inv);
+        }
+      };
+
       allInvoices.forEach(inv => {
-        if (inv.testOrderId) invoiceMap.set(inv.testOrderId.toString(), inv);
-        if (inv.quotationNumber) invoiceMap.set(inv.quotationNumber, inv);
+        if (inv.testOrderId) updateMap(inv.testOrderId.toString(), inv);
+        if (inv.quotationNumber) updateMap(inv.quotationNumber, inv);
       });
       
       const reportsWithPayment = reports.map(r => {
