@@ -9,8 +9,11 @@ import {
 } from 'react-icons/fi';
 import { useAuthStore } from '../../stores/auth.store';
 import { Role } from '../../types';
+import FilterBar from '../../components/common/FilterBar';
+import ConfirmModal from '../../components/common/ConfirmModal';
 
 export default function LabReportsPage() {
+  const { user: currentUser } = useAuthStore();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -20,20 +23,29 @@ export default function LabReportsPage() {
   const [results, setResults] = useState<any[]>([]);
   const [htmlContent, setHtmlContent] = useState('');
   const [showHtmlEditor, setShowHtmlEditor] = useState(false);
-  const { user } = useAuthStore();
   const handledRef = useRef<string | null>(null);
+
+  const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [showVerifyConfirm, setShowVerifyConfirm] = useState<string | null>(null);
   
-  const canManage = [Role.ADMIN, Role.SUPER_ADMIN, Role.LAB, Role.LAB_EMP].includes(user?.role as Role);
-  const canVerify = [Role.ADMIN, Role.SUPER_ADMIN, Role.LAB, Role.LAB_EMP].includes(user?.role as Role);
-  const isAdminScope = [Role.SUPER_ADMIN, Role.ADMIN].includes(user?.role as Role);
+  const canManage = [Role.ADMIN, Role.SUPER_ADMIN, Role.LAB, Role.LAB_EMP].includes(currentUser?.role as Role);
+  const canVerify = [Role.ADMIN, Role.SUPER_ADMIN, Role.LAB, Role.LAB_EMP].includes(currentUser?.role as Role);
+  const isAdminScope = [Role.SUPER_ADMIN, Role.ADMIN].includes(currentUser?.role as Role);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['lab-reports', selectedBranchId, testOrderId],
+    queryKey: ['lab-reports', selectedBranchId, testOrderId, search, sortBy, statusFilter],
     queryFn: () => labReportsApi.getAll({ 
       ...(selectedBranchId ? { branchId: selectedBranchId } : {}),
       ...(testOrderId ? { testOrderId } : {}),
-      limit: 100 // Allow more for direct management
+      search,
+      sortBy,
+      status: statusFilter,
+      limit: 100,
+      user: currentUser 
     }),
+    enabled: !!currentUser
   });
 
   const { data: branchesData } = useQuery({
@@ -61,14 +73,14 @@ export default function LabReportsPage() {
     mutationFn: (id: string) => labReportsApi.verify(id),
     onSuccess: () => { 
       queryClient.invalidateQueries({ queryKey: ['lab-reports'] }); 
-      toast.success('Report verified and emailed to patient'); 
+      toast.success('Report verified and emailed to contact person'); 
     },
     onError: (err: any) => toast.error(err.response?.data?.message || 'Failed'),
   });
 
   const sendMutation = useMutation({
     mutationFn: (id: string) => labReportsApi.send(id),
-    onSuccess: () => toast.success('Report dispatched to patient email'),
+    onSuccess: () => toast.success('Report dispatched to contact person email'),
     onError: (err: any) => toast.error(err.response?.data?.message || 'Failed to send email'),
   });
 
@@ -281,8 +293,8 @@ export default function LabReportsPage() {
               {/* Internal Report View */}
               <div className="flex justify-between items-center border-b-2 border-primary-600 pb-4">
                 <div>
-                  <h3 className="text-2xl font-bold text-primary-700">{(user?.branchId as any)?.labName || 'NighaTech Healthcare Lab'}</h3>
-                  <p className="text-xs text-gray-500">{(user?.branchId as any)?.address}</p>
+                  <h3 className="text-2xl font-bold text-primary-700">{(currentUser?.branchId as any)?.labName || 'NighaTech Healthcare Lab'}</h3>
+                  <p className="text-xs text-gray-500">{(currentUser?.branchId as any)?.address}</p>
                 </div>
                 <div className="text-right">
                   <div className="text-xs font-bold uppercase text-gray-400">Date Generated</div>
@@ -292,7 +304,7 @@ export default function LabReportsPage() {
 
               {/* Patient Banner */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-primary-50 p-4 rounded-lg text-sm border border-primary-100">
-                <div><span className="text-primary-700 font-bold block text-[10px] uppercase">Patient</span> {reports.find((r: any) => r._id === editingId)?.clientId?.name || '—'}</div>
+                <div><span className="text-primary-700 font-bold block text-[10px] uppercase">Contact Person</span> {reports.find((r: any) => r._id === editingId)?.clientId?.name || '—'}</div>
                 <div><span className="text-primary-700 font-bold block text-[10px] uppercase">Age/Gender</span> {reports.find((r: any) => r._id === editingId)?.clientId?.age || '—'} / {reports.find((r: any) => r._id === editingId)?.clientId?.gender || '—'}</div>
                 <div><span className="text-primary-700 font-bold block text-[10px] uppercase">Order ID</span> {reports.find((r: any) => r._id === editingId)?.testOrderId?.orderNumber || '—'}</div>
                 <div><span className="text-primary-700 font-bold block text-[10px] uppercase">Test Name</span> {reports.find((r: any) => r._id === editingId)?.testId?.name || '—'}</div>
@@ -395,9 +407,42 @@ export default function LabReportsPage() {
         </div>
       )}
 
+      <FilterBar 
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search by report number or patient name..."
+        sortBy={sortBy}
+        onSortChange={setSortBy}
+        sortOptions={[
+          { label: 'Newest First', value: 'createdAt' },
+          { label: 'Report #', value: 'reportNumber' },
+          { label: 'Status', value: 'status' },
+        ]}
+        filters={
+          <select 
+            value={statusFilter} 
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="input-field text-sm"
+          >
+            <option value="">All Statuses</option>
+            <option value="PENDING">Pending</option>
+            <option value="RESULTS_ENTERED">Results Entered</option>
+            <option value="VERIFIED">Verified</option>
+          </select>
+        }
+      />
+
+      <ConfirmModal 
+        isOpen={!!showVerifyConfirm}
+        onClose={() => setShowVerifyConfirm(null)}
+        onConfirm={() => showVerifyConfirm && verifyMutation.mutate(showVerifyConfirm)}
+        title="Verify Report"
+        message="Are you sure you want to verify this report? Once verified, it cannot be edited, and the patient will be notified."
+        confirmText="Verify & Finalize"
+      />
       <div className="table-container">
         <table>
-          <thead><tr><th>Report #</th>{canManage && <th>Patient</th>}<th>Test</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Report #</th>{canManage && <th>Contact Person</th>}<th>Test</th><th>Payment Status</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
           <tbody>
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
@@ -409,6 +454,19 @@ export default function LabReportsPage() {
                 {canManage && <td>{report.clientId?.name || '—'}</td>}
                 <td>{report.testId?.name || '—'}</td>
                 <td>
+                  <div className="flex flex-col gap-1">
+                    <span className={`text-[10px] font-bold uppercase ${report.payment?.balance === 0 ? 'text-green-500' : report.payment?.paidAmount > 0 ? 'text-orange-500' : 'text-red-500'}`}>
+                      {report.payment?.balance === 0 ? 'Fully Paid' : report.payment?.paidAmount > 0 ? 'Partial Paid' : 'Unpaid'}
+                    </span>
+                    <div className="w-20 h-1 bg-surface-700 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full ${report.payment?.balance === 0 ? 'bg-green-500' : 'bg-orange-500'}`} 
+                        style={{ width: `${Math.min(100, (report.payment?.paidAmount / (report.payment?.paidAmount + report.payment?.balance)) * 100 || 0)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </td>
+                <td>
                   <span className={`badge ${
                     report.status === 'VERIFIED' ? 'badge-success' :
                     report.status === 'RESULTS_ENTERED' ? 'badge-warning' : 'badge-info'
@@ -418,17 +476,29 @@ export default function LabReportsPage() {
                 <td>
                   <div className="flex items-center gap-2">
                     {canManage && report.status === 'PENDING' && (
-                      <button onClick={() => startEdit(report)} className="text-primary-400 hover:text-primary-300" title="Enter Results"><FiEdit3 size={16} /></button>
+                      <button 
+                        onClick={() => report.payment?.paidAmount > 0 ? startEdit(report) : toast.error('Payment required to enter results')} 
+                        className={`${report.payment?.paidAmount > 0 ? 'text-primary-400 hover:text-primary-300' : 'text-surface-600 cursor-not-allowed'}`} 
+                        title={report.payment?.paidAmount > 0 ? "Enter Results" : "At least partial payment required"}
+                      >
+                        <FiEdit3 size={16} />
+                      </button>
                     )}
                     {canManage && report.status === 'RESULTS_ENTERED' && (
                       <>
-                        <button onClick={() => startEdit(report)} className="text-blue-400 hover:text-blue-300" title="Edit Results"><FiEdit3 size={16} /></button>
+                        <button 
+                          onClick={() => startEdit(report)} 
+                          className="text-blue-400 hover:text-blue-300" 
+                          title="Edit Results"
+                        >
+                          <FiEdit3 size={16} />
+                        </button>
                         {canVerify && (
                           <button 
-                            onClick={() => verifyMutation.mutate(report._id)} 
-                            className={`text-green-400 hover:text-green-300 transition-all ${verifyMutation.isPending ? 'opacity-50 cursor-wait animate-pulse text-green-200' : ''}`} 
+                            onClick={() => report.payment?.balance === 0 ? setShowVerifyConfirm(report._id) : toast.error('Full payment required to verify report')} 
+                            className={`transition-all ${report.payment?.balance === 0 ? 'text-green-400 hover:text-green-300' : 'text-surface-600 cursor-not-allowed'} ${verifyMutation.isPending ? 'opacity-50 cursor-wait animate-pulse' : ''}`} 
                             disabled={verifyMutation.isPending}
-                            title={verifyMutation.isPending ? 'Verifying...' : 'Verify'}
+                            title={report.payment?.balance === 0 ? (verifyMutation.isPending ? 'Verifying...' : 'Verify') : "Full payment required to verify"}
                           >
                             <FiCheckCircle size={16} />
                           </button>
@@ -437,13 +507,25 @@ export default function LabReportsPage() {
                     )}
                     {report.status === 'VERIFIED' && (
                       <>
-                        <button onClick={() => navigate(`/reports/${report._id}`)} className="text-primary-400 hover:text-primary-300" title="View"><FiEye size={16} /></button>
-                        <button onClick={() => downloadPdf(report._id, report.reportNumber)} className="text-green-400 hover:text-green-300" title="Download PDF"><FiDownload size={16} /></button>
                         <button 
-                          onClick={() => sendMutation.mutate(report._id)} 
-                          className="text-primary-400 hover:text-primary-300" 
+                          onClick={() => report.payment?.balance === 0 ? navigate(`/reports/${report._id}`) : toast.error('Full payment required')} 
+                          className={`${report.payment?.balance === 0 ? 'text-primary-400 hover:text-primary-300' : 'text-surface-600 cursor-not-allowed'}`}
+                          title={report.payment?.balance === 0 ? "View" : "Full payment required"}
+                        >
+                          <FiEye size={16} />
+                        </button>
+                        <button 
+                          onClick={() => report.payment?.balance === 0 ? downloadPdf(report._id, report.reportNumber) : toast.error('Full payment required')} 
+                          className={`${report.payment?.balance === 0 ? 'text-green-400 hover:text-green-300' : 'text-surface-600 cursor-not-allowed'}`}
+                          title={report.payment?.balance === 0 ? "Download PDF" : "Full payment required"}
+                        >
+                          <FiDownload size={16} />
+                        </button>
+                        <button 
+                          onClick={() => report.payment?.balance === 0 ? sendMutation.mutate(report._id) : toast.error('Full payment required')} 
+                          className={`${report.payment?.balance === 0 ? 'text-primary-400 hover:text-primary-300' : 'text-surface-600 cursor-not-allowed'}`} 
                           disabled={sendMutation.isPending}
-                          title="Send to Patient Email"
+                          title={report.payment?.balance === 0 ? "Send to Contact Person Email" : "Full payment required"}
                         >
                           <FiMail size={16} className={sendMutation.isPending ? 'animate-pulse' : ''} />
                         </button>

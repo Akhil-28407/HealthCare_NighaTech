@@ -1,8 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { auditLogsApi } from '../../api';
+import { useAuthStore } from '../../stores/auth.store';
 
 export default function AuditLogsPage() {
-  const { data, isLoading } = useQuery({ queryKey: ['audit-logs'], queryFn: () => auditLogsApi.getAll({ limit: 50 }) });
+  const { user: currentUser } = useAuthStore();
+  const { data, isLoading } = useQuery({ 
+    queryKey: ['audit-logs'], 
+    queryFn: () => auditLogsApi.getAll({ limit: 50 }),
+    enabled: !!currentUser
+  });
 
   return (
     <div className="space-y-6">

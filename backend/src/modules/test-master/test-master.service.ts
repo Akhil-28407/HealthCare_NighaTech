@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/co
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { TestMaster, TestMasterDocument } from './schemas/test-master.schema';
+import { Role } from '../../common/enums/role.enum';
 
 @Injectable()
 export class TestMasterService {
@@ -19,10 +20,10 @@ export class TestMasterService {
   }
 
   async findAll(query: any = {}, user?: any) {
-    const { page = 1, limit = 50, search, category, branchId } = query;
+    const { page = 1, limit = 50, search, category, branchId, sortBy = 'name', sortOrder = 'asc' } = query;
     const filter: any = { isActive: true };
 
-    if (user?.role === 'LAB' || user?.role === 'LAB_EMP') {
+    if (user?.role === Role.LAB || user?.role === Role.LAB_EMP) {
       if (user.branchId && Types.ObjectId.isValid(user.branchId)) {
         filter.branchId = user.branchId;
       }
@@ -37,8 +38,17 @@ export class TestMasterService {
         { code: { $regex: search, $options: 'i' } },
       ];
     }
+
+    const sort: any = {};
+    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
     const [tests, total] = await Promise.all([
-      this.testModel.find(filter).populate('branchId', 'name labName').skip((page - 1) * limit).limit(limit).sort({ name: 1 }).lean(),
+      this.testModel.find(filter)
+        .populate('branchId', 'name labName')
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .sort(sort)
+        .lean(),
       this.testModel.countDocuments(filter),
     ]);
     return { tests, total, page: Number(page), limit: Number(limit) };

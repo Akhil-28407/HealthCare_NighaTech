@@ -4,6 +4,7 @@ import { quotationsApi, clientsApi } from '../../api';
 import toast from 'react-hot-toast';
 import { FiPlus, FiSend, FiRefreshCw, FiEye, FiDownload } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../../stores/auth.store';
 
 
 export default function QuotationsPage() {
@@ -12,8 +13,17 @@ export default function QuotationsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ clientId: '', items: [{ name: '', quantity: 1, unitPrice: 0, description: '' }], tax: 0, discount: 0, notes: '' });
 
-  const { data } = useQuery({ queryKey: ['quotations'], queryFn: () => quotationsApi.getAll() });
-  const { data: clientsData } = useQuery({ queryKey: ['clients-list'], queryFn: () => clientsApi.getAll({ limit: 100 }) });
+  const { user: currentUser } = useAuthStore();
+  const { data } = useQuery({ 
+    queryKey: ['quotations'], 
+    queryFn: () => quotationsApi.getAll(),
+    enabled: !!currentUser
+  });
+  const { data: clientsData } = useQuery({ 
+    queryKey: ['clients-list'], 
+    queryFn: () => clientsApi.getAll({ limit: 100 }),
+    enabled: !!currentUser
+  });
 
   const createMutation = useMutation({ mutationFn: (d: any) => quotationsApi.create(d), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['quotations'] }); toast.success('Quotation created'); setShowCreate(false); } });
   const sendMutation = useMutation({ mutationFn: (id: string) => quotationsApi.send(id), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['quotations'] }); toast.success('Sent'); } });

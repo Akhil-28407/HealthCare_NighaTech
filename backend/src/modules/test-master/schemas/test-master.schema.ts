@@ -57,3 +57,9 @@ export class TestMaster {
 }
 
 export const TestMasterSchema = SchemaFactory.createForClass(TestMaster);
+
+// Performance Indexes
+TestMasterSchema.index({ branchId: 1, category: 1 });
+TestMasterSchema.index({ name: 1 });
+TestMasterSchema.index({ code: 1 });
+TestMasterSchema.index({ isActive: 1, branchId: 1 });

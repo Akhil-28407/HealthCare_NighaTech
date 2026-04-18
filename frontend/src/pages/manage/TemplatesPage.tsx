@@ -21,7 +21,11 @@ export default function TemplatesPage() {
 
   const isBranchPending = currentUser?.role === Role.LAB && !currentUser.branchId;
 
-  const { data } = useQuery({ queryKey: ['templates'], queryFn: () => templatesApi.getAll() });
+  const { data } = useQuery({ 
+    queryKey: ['templates'], 
+    queryFn: () => templatesApi.getAll(),
+    enabled: !!currentUser
+  });
 
   const createMutation = useMutation({
     mutationFn: (d: any) => templatesApi.create(d),

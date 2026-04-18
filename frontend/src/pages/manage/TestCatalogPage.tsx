@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { branchesApi, testMasterApi } from '../../api';
 import toast from 'react-hot-toast';
 import { FiPlus, FiEdit2, FiTrash2, FiX } from 'react-icons/fi';
+import FilterBar from '../../components/common/FilterBar';
 import { useAuthStore } from '../../stores/auth.store';
 import { Role } from '../../types';
 
@@ -26,12 +27,23 @@ export default function TestCatalogPage() {
     parameters: [] as any[],
   });
 
+  const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState('name');
+  const [categoryFilter, setCategoryFilter] = useState('');
+
   const canManage = [Role.SUPER_ADMIN, Role.ADMIN, Role.LAB, Role.LAB_EMP].includes(currentUser?.role as Role);
   const isAdminScope = [Role.SUPER_ADMIN, Role.ADMIN].includes(currentUser?.role as Role);
 
   const { data, isLoading } = useQuery({ 
-    queryKey: ['test-master', selectedBranchId], 
-    queryFn: () => testMasterApi.getAll({ limit: 100, ...(selectedBranchId ? { branchId: selectedBranchId } : {}) }),
+    queryKey: ['test-master', selectedBranchId, search, sortBy, categoryFilter], 
+    queryFn: () => testMasterApi.getAll({ 
+      search,
+      sortBy,
+      category: categoryFilter,
+      limit: 100, 
+      ...(selectedBranchId ? { branchId: selectedBranchId } : {}) 
+    }),
+    enabled: !!currentUser,
   });
 
   const { data: branchesData } = useQuery({
@@ -142,6 +154,28 @@ export default function TestCatalogPage() {
           </select>
         </div>
       )}
+
+      <FilterBar 
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search by test name or code..."
+        sortBy={sortBy}
+        onSortChange={setSortBy}
+        sortOptions={[
+          { label: 'Name (A-Z)', value: 'name' },
+          { label: 'Price', value: 'price' },
+          { label: 'Category', value: 'category' },
+        ]}
+        filters={
+          <input 
+            type="text" 
+            placeholder="Category filter..." 
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="input-field text-sm py-1.5"
+          />
+        }
+      />
 
       {showForm && (
         <div className="glass-card p-6 space-y-6">

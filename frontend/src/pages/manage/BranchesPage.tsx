@@ -40,7 +40,8 @@ export default function BranchesPage() {
 
   const { data, isLoading } = useQuery({ 
     queryKey: ['branches'], 
-    queryFn: () => branchesApi.getAll() 
+    queryFn: () => branchesApi.getAll(),
+    enabled: !!currentUser
   });
 
   const isLabRole = currentUser?.role === Role.LAB;

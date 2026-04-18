@@ -83,6 +83,7 @@ export const invoicesApi = {
   create: (data: any) => api.post('/invoices', data),
   send: (id: string) => api.post(`/invoices/${id}/send`),
   markPaid: (id: string) => api.post(`/invoices/${id}/mark-paid`),
+  recordPayment: (id: string, amount: number) => api.post(`/invoices/${id}/record-payment`, { amount }),
   downloadPdf: (id: string) =>
     api.get(`/invoices/${id}/pdf`, { responseType: 'blob' }),
 };

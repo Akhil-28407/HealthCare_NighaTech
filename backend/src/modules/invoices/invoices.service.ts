@@ -37,12 +37,13 @@ export class InvoicesService {
       items,
       subtotal,
       total,
+      balance: total, // Initialize balance to total
     });
   }
 
   async findAll(query: any = {}, user?: any) {
-    const { page = 1, limit = 20, status, clientId, branchId } = query;
-    const filter: any = { clientId: { $type: 'objectId' } };
+    const { page = 1, limit = 20, status, clientId, branchId, search, sortBy = 'createdAt', sortOrder = 'desc' } = query;
+    const filter: any = {};
 
     if (user) {
       if (user.role === Role.CLIENT) {
@@ -68,11 +69,26 @@ export class InvoicesService {
     if (status) filter.status = status;
     if (clientId && Types.ObjectId.isValid(clientId)) filter.clientId = clientId;
 
+    if (search) {
+      const clientsWithSearch = await this.clientModel.find({ name: { $regex: search, $options: 'i' } }).select('_id').lean();
+      const clientIds = clientsWithSearch.map(c => c._id);
+      filter.$or = [
+        { invoiceNumber: { $regex: search, $options: 'i' } },
+        { clientId: { $in: clientIds } }
+      ];
+    }
+
+    const sort: any = {};
+    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
     const [invoices, total] = await Promise.all([
       this.invoiceModel.find(filter)
         .populate('clientId', 'name email mobile')
         .populate('branchId', 'name')
-        .skip((page - 1) * limit).limit(limit).sort({ createdAt: -1 }).lean(),
+        .skip((Number(page) - 1) * Number(limit))
+        .limit(Number(limit))
+        .sort(sort)
+        .lean(),
       this.invoiceModel.countDocuments(filter),
     ]);
     return { invoices, total, page: Number(page), limit: Number(limit) };
@@ -105,12 +121,39 @@ export class InvoicesService {
   }
 
   async markPaid(id: string) {
-    const invoice = await this.invoiceModel.findByIdAndUpdate(
-      id,
-      { status: InvoiceStatus.PAID, paidAt: new Date() },
-      { new: true },
-    );
+    const invoice = await this.invoiceModel.findById(id);
     if (!invoice) throw new NotFoundException('Invoice not found');
+
+    invoice.status = InvoiceStatus.PAID;
+    invoice.paidAt = new Date();
+    invoice.paidAmount = invoice.total;
+    invoice.balance = 0;
+    
+    await invoice.save();
+    return invoice;
+  }
+
+  async recordPayment(id: string, amount: number) {
+    if (amount <= 0) throw new BadRequestException('Amount must be greater than zero');
+    
+    const invoice = await this.invoiceModel.findById(id);
+    if (!invoice) throw new NotFoundException('Invoice not found');
+
+    invoice.paidAmount = (invoice.paidAmount || 0) + amount;
+    invoice.balance = invoice.total - invoice.paidAmount;
+
+    if (invoice.balance <= 0) {
+      invoice.status = InvoiceStatus.PAID;
+      invoice.paidAt = new Date();
+      invoice.balance = 0;
+    } else {
+      // If payment is recorded, status should at least be SENT if it was DRAFT
+      if (invoice.status === InvoiceStatus.DRAFT) {
+        invoice.status = InvoiceStatus.SENT;
+      }
+    }
+
+    await invoice.save();
     return invoice;
   }
 }

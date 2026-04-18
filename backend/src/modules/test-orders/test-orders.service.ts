@@ -5,6 +5,8 @@ import { TestOrder, TestOrderDocument, TestOrderStatus } from './schemas/test-or
 import { TestMaster, TestMasterDocument } from '../test-master/schemas/test-master.schema';
 import { LabReport, LabReportDocument, ReportStatus } from '../lab-reports/schemas/lab-report.schema';
 import { CounterService } from '../counter/counter.service';
+import { InvoicesService } from '../invoices/invoices.service';
+import { Role } from '../../common/enums/role.enum';
 
 @Injectable()
 export class TestOrdersService {
@@ -13,6 +15,7 @@ export class TestOrdersService {
     @InjectModel(TestMaster.name) private testModel: Model<TestMasterDocument>,
     @InjectModel(LabReport.name) private reportModel: Model<LabReportDocument>,
     private counterService: CounterService,
+    private invoicesService: InvoicesService,
   ) {}
 
   async create(dto: any, user: any) {
@@ -35,6 +38,12 @@ export class TestOrdersService {
 
     dto.tests = validTestIds;
 
+    // Fetch client details for auto-population
+    const client = await this.orderModel.db.collection('clients').findOne({ _id: dto.clientId });
+    if (!client) {
+      throw new BadRequestException('Client not found');
+    }
+
     const orderNumber = await this.counterService.generateNumber('ORD', 'test-order');
 
     // Calculate total from tests
@@ -53,6 +62,10 @@ export class TestOrdersService {
       status: dto.autoCollect ? TestOrderStatus.COLLECTED : TestOrderStatus.ORDERED,
       sampleCollectedAt: dto.autoCollect ? new Date() : undefined,
       collectedBy: dto.autoCollect ? new Types.ObjectId(user.sub) : undefined,
+      // Auto-populate contact person details from Client if not provided
+      contactPersonName: dto.contactPersonName || client.name,
+      email: dto.email || client.email,
+      phone: dto.phone || client.mobile,
     };
 
     if (user.role === 'LAB' || user.role === 'LAB_EMP') {
@@ -89,17 +102,37 @@ export class TestOrdersService {
       }
     }
 
+    // Automatically create an invoice for the test order
+    try {
+      await this.invoicesService.create({
+        clientId: order.clientId,
+        testOrderId: order._id,
+        branchId: order.branchId,
+        items: testsData.map(test => ({
+          name: test.name,
+          quantity: 1,
+          unitPrice: test.price || 0,
+          description: test.category || 'Clinical Test'
+        })),
+        discount: order.discount || 0,
+        notes: `Invoice generated for Order ${order.orderNumber}`
+      });
+    } catch (invError) {
+      console.error(`[TestOrders] Failed to auto-create invoice for order ${order.orderNumber}:`, invError.message);
+      // We don't throw here to avoid failing the order creation itself
+    }
+
     return order;
   }
 
   async findAll(query: any = {}, user?: any) {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 20;
-    const { status, clientId, branchId } = query;
+    const { status, clientId, branchId, search, sortBy = 'createdAt', sortOrder = 'desc' } = query;
     const filter: any = {};
     
     // Role-based branch isolation
-    if (user && (user.role === 'LAB' || user.role === 'LAB_EMP')) {
+    if (user && (user.role === Role.LAB || user.role === Role.LAB_EMP)) {
       if (!user.branchId || !Types.ObjectId.isValid(user.branchId)) {
         return { orders: [], total: 0, page, limit, error: 'Branch not approved' };
       }
@@ -111,13 +144,27 @@ export class TestOrdersService {
     if (status) filter.status = status;
     if (clientId) filter.clientId = clientId;
 
+    if (search) {
+      filter.$or = [
+        { orderNumber: { $regex: search, $options: 'i' } },
+        { clientName: { $regex: search, $options: 'i' } },
+        { contactPersonName: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const sort: any = {};
+    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
     const [orders, total] = await Promise.all([
       this.orderModel.find(filter)
         .populate('clientId', 'name email mobile')
         .populate('tests', 'name code price')
         .populate('orderedBy', 'name')
         .populate('collectedBy', 'name')
-        .skip((page - 1) * limit).limit(limit).sort({ createdAt: -1 }).lean(),
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .sort(sort)
+        .lean(),
       this.orderModel.countDocuments(filter),
     ]);
     return { orders, total, page, limit };

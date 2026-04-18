@@ -21,13 +21,13 @@ export class LabReportsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all lab reports' })
-  findAll(@Query() query: any, @CurrentUser() user: any) { 
+  findAll(@Query() query: any, @CurrentUser() user: any): Promise<any> { 
     return this.service.findAll(query, user); 
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get lab report by ID (public for verified reports)' })
-  findById(@Param('id') id: string) { 
+  findById(@Param('id') id: string): Promise<any> { 
     return this.service.findById(id); 
   }
 

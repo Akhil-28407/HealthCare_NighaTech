@@ -7,6 +7,7 @@ import { TestMasterModule } from '../test-master/test-master.module';
 import { LabReportsModule } from '../lab-reports/lab-reports.module';
 import { CounterModule } from '../counter/counter.module';
 import { AuthModule } from '../auth/auth.module';
+import { InvoicesModule } from '../invoices/invoices.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { AuthModule } from '../auth/auth.module';
     LabReportsModule,
     CounterModule,
     AuthModule,
+    InvoicesModule,
   ],
   controllers: [TestOrdersController],
   providers: [TestOrdersService],

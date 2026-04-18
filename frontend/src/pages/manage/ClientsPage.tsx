@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { clientsApi } from '../../api';
 import toast from 'react-hot-toast';
 import { FiPlus, FiSearch, FiUser, FiNavigation, FiCheck, FiPhone, FiTrash2 } from 'react-icons/fi';
+import { useAuthStore } from '../../stores/auth.store';
 
 export default function ClientsPage() {
   const queryClient = useQueryClient();
@@ -13,13 +14,18 @@ export default function ClientsPage() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  const { data, isLoading } = useQuery({ queryKey: ['clients'], queryFn: () => clientsApi.getAll() });
+  const { user: currentUser } = useAuthStore();
+  const { data, isLoading } = useQuery({ 
+    queryKey: ['clients'], 
+    queryFn: () => clientsApi.getAll(),
+    enabled: !!currentUser
+  });
 
   const createMutation = useMutation({
     mutationFn: (d: any) => clientsApi.create({ ...d, age: Number(d.age) }),
     onSuccess: () => { 
       queryClient.invalidateQueries({ queryKey: ['clients'] }); 
-      toast.success('Client added to your branch'); 
+      toast.success('Contact Person added to your branch'); 
       setShowCreate(false); 
       resetForm();
     },
@@ -30,13 +36,13 @@ export default function ClientsPage() {
     mutationFn: (id: string) => clientsApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
-      toast.success('Patient record removed');
+      toast.success('Contact Person record removed');
     },
-    onError: (err: any) => toast.error(err.response?.data?.message || 'Failed to remove patient'),
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Failed to remove contact person'),
   });
 
   const handleDelete = (id: string, name: string) => {
-    if (window.confirm(`Are you sure you want to remove ${name} from your branch records? All history will be unlinked (but reports remain accessible to the patient).`)) {
+    if (window.confirm(`Are you sure you want to remove ${name} from your branch records? All history will be unlinked (but reports remain accessible to them).`)) {
       deleteMutation.mutate(id);
     }
   };
@@ -86,8 +92,8 @@ export default function ClientsPage() {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black text-white tracking-tight">Clients & Patients</h1>
-          <p className="text-sm text-surface-400 font-medium">Manage your lab's patient records</p>
+          <h1 className="text-2xl font-black text-white tracking-tight">Contact Persons</h1>
+          <p className="text-sm text-surface-400 font-medium">Manage your lab's contact person records</p>
         </div>
         <button 
           onClick={() => {
@@ -96,7 +102,7 @@ export default function ClientsPage() {
           }} 
           className={`btn-primary flex items-center gap-2 px-6 py-3 shadow-lg transition-all ${showCreate ? 'bg-red-500 hover:bg-red-600 shadow-red-500/20' : 'shadow-primary-500/20'}`}
         >
-          {showCreate ? 'Close Form' : <><FiPlus /> Add New Client</>}
+          {showCreate ? 'Close Form' : <><FiPlus /> Add New Contact Person</>}
         </button>
       </div>
 
@@ -108,12 +114,12 @@ export default function ClientsPage() {
             </div>
             <div>
               <h3 className="text-lg font-bold text-white">Smart Registration</h3>
-              <p className="text-xs text-surface-400 font-medium">Enter mobile number to find existing patient profiles across HealthCare Hub.</p>
+              <p className="text-xs text-surface-400 font-medium">Enter mobile number to find existing profiles across HealthCare Hub.</p>
             </div>
           </div>
 
           <div className="relative">
-            <label className="label text-primary-400 font-black tracking-widest uppercase text-[10px]">Step 1: Identity Discovery</label>
+            <label className="label text-primary-400 font-black tracking-widest uppercase text-[10px]">Step 1: Contact Discovery</label>
             <div className="relative group">
               <FiPhone className="absolute left-4 top-1/2 -translate-y-1/2 text-surface-400 group-focus-within:text-primary-400 transition-colors" size={18} />
               <input 
@@ -170,7 +176,7 @@ export default function ClientsPage() {
           <div className="space-y-6">
             <label className="label text-primary-400 font-black tracking-widest uppercase text-[10px]">Step 2: Profile Details</label>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div><label className="label">Patient Name</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field bg-white/5" required /></div>
+              <div><label className="label">Contact Person Name</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field bg-white/5" required /></div>
               <div><label className="label">Email Address</label><input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input-field bg-white/5" /></div>
               <div><label className="label">Age</label><input type="number" value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} className="input-field bg-white/5" /></div>
               <div><label className="label">Gender</label>
@@ -189,7 +195,7 @@ export default function ClientsPage() {
               disabled={createMutation.isPending}
               className="btn-primary flex-1 py-4 font-bold flex items-center justify-center gap-2"
             >
-              {createMutation.isPending ? <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" /> : <><FiCheck /> Save Patient Profile</>}
+              {createMutation.isPending ? <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" /> : <><FiCheck /> Save Contact Profile</>}
             </button>
             <button onClick={() => { setShowCreate(false); resetForm(); }} className="btn-secondary flex-1 py-4">Discard</button>
           </div>
@@ -200,8 +206,8 @@ export default function ClientsPage() {
         <table>
           <thead>
             <tr>
-              <th><FiUser className="inline mr-2" /> Patient Profile</th>
-              <th>Contact</th>
+              <th><FiUser className="inline mr-2" /> Contact Profile</th>
+              <th>Contact Info</th>
               <th>Details</th>
               <th>Referred By</th>
               <th className="text-right">Actions</th>
@@ -240,7 +246,7 @@ export default function ClientsPage() {
                       onClick={() => handleDelete(c._id, c.name)}
                       disabled={deleteMutation.isPending}
                       className="p-2 text-surface-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
-                      title="Remove Patient"
+                      title="Remove Contact Person"
                     >
                       <FiTrash2 size={16} />
                     </button>
@@ -250,8 +256,8 @@ export default function ClientsPage() {
             ) : (
               <tr>
                 <td colSpan={4} className="py-20 text-center">
-                  <p className="text-surface-400 font-bold">No patients found in your records.</p>
-                  <p className="text-xs text-surface-500 mt-2">Click \"Add Client\" to register a new patient.</p>
+                  <p className="text-surface-400 font-bold">No contact persons found in your records.</p>
+                  <p className="text-xs text-surface-500 mt-2">Click \"Add New Contact Person\" to register.</p>
                 </td>
               </tr>
             )}

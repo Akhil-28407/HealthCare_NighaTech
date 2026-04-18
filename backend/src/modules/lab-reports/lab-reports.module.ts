@@ -6,6 +6,7 @@ import { Client, ClientSchema } from '../clients/schemas/client.schema';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { Branch, BranchSchema } from '../branches/schemas/branch.schema';
 import { TestMaster, TestMasterSchema } from '../test-master/schemas/test-master.schema';
+import { Invoice, InvoiceSchema } from '../invoices/schemas/invoice.schema';
 import { LabReportsService } from './lab-reports.service';
 import { LabReportsController } from './lab-reports.controller';
 import { PdfModule } from '../pdf/pdf.module';
@@ -21,6 +22,7 @@ import { MailModule } from '../mail/mail.module';
       { name: User.name, schema: UserSchema },
       { name: Branch.name, schema: BranchSchema },
       { name: TestMaster.name, schema: TestMasterSchema },
+      { name: Invoice.name, schema: InvoiceSchema },
     ]),
     PdfModule,
     AuthModule,

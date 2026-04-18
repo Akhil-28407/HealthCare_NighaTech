@@ -8,6 +8,7 @@ import { TestOrder, TestOrderDocument, TestOrderStatus } from '../test-orders/sc
 import { Client, ClientDocument } from '../clients/schemas/client.schema';
 import { PdfService } from '../pdf/pdf.service';
 import { MailService } from '../mail/mail.service';
+import { Invoice, InvoiceDocument } from '../invoices/schemas/invoice.schema';
 import { Role } from '../../common/enums/role.enum';
 
 @Injectable()
@@ -16,21 +17,21 @@ export class LabReportsService {
     @InjectModel(LabReport.name) private reportModel: Model<LabReportDocument>,
     @InjectModel(TestOrder.name) private orderModel: Model<TestOrderDocument>,
     @InjectModel(Client.name) private clientModel: Model<ClientDocument>,
+    @InjectModel(Invoice.name) private invoiceModel: Model<InvoiceDocument>,
     private configService: ConfigService,
     private pdfService: PdfService,
     private mailService: MailService,
   ) {}
 
-  async findAll(query: any = {}, user: any) {
+  async findAll(query: any = {}, user: any): Promise<any> {
     try {
       const page = Number(query.page) || 1;
       const limit = Number(query.limit) || 20;
-      const { status, clientId, testOrderId, branchId } = query;
+      const { status, clientId, testOrderId, branchId, search, sortBy = 'createdAt', sortOrder = 'desc' } = query;
       const filter: any = {};
       
       // Role based filtering
       if (user.role === Role.CLIENT) {
-        // Find all client profiles associated with this user's mobile number
         const clients = await this.clientModel.find({ mobile: user.mobile }).lean();
         if (clients.length > 0) {
           const clientIds = clients.map(c => c._id);
@@ -47,10 +48,23 @@ export class LabReportsService {
         filter.branchId = branchId;
       }
 
-      // Robust check for other filters
       if (clientId && Types.ObjectId.isValid(clientId)) filter.clientId = new Types.ObjectId(clientId);
       if (testOrderId && Types.ObjectId.isValid(testOrderId)) filter.testOrderId = new Types.ObjectId(testOrderId);
       if (status && status !== '') filter.status = status;
+
+      if (search) {
+        // Search by report number OR find clients by name and search by their IDs
+        const clientsWithName = await this.clientModel.find({ name: { $regex: search, $options: 'i' } }).select('_id').lean();
+        const clientIds = clientsWithName.map(c => c._id);
+        
+        filter.$or = [
+          { reportNumber: { $regex: search, $options: 'i' } },
+          { clientId: { $in: clientIds } }
+        ];
+      }
+
+      const sort: any = {};
+      sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
       console.log(`[LabReports] FindAll filters:`, JSON.stringify(filter));
 
@@ -58,25 +72,45 @@ export class LabReportsService {
         this.reportModel.find(filter)
           .populate('clientId', 'name mobile')
           .populate('testId', 'name category')
-          .populate('testOrderId', 'orderNumber')
+          .populate('testOrderId', 'orderNumber netAmount')
           .populate('branchId', 'name')
           .populate('enteredBy', 'name')
           .populate('verifiedBy', 'name')
-          .skip((page - 1) * limit).limit(limit).sort({ createdAt: -1 }).lean(),
+          .skip((page - 1) * limit)
+          .limit(limit)
+          .sort(sort)
+          .lean(),
         this.reportModel.countDocuments(filter),
       ]);
-      return { reports, total, page, limit };
+
+      // Attach payment status to each report
+      const orderIds = reports.map(r => r.testOrderId?._id || r.testOrderId);
+      const invoices = await this.invoiceModel.find({ testOrderId: { $in: orderIds } }).lean();
+      
+      const reportsWithPayment = reports.map(r => {
+        const inv = invoices.find(i => i.testOrderId?.toString() === (r.testOrderId?._id || r.testOrderId)?.toString());
+        return {
+          ...r,
+          payment: {
+            paidAmount: inv?.paidAmount || 0,
+            balance: inv ? (inv.balance ?? inv.total) : (typeof r.testOrderId === 'object' && r.testOrderId !== null && 'netAmount' in r.testOrderId ? (r.testOrderId as any).netAmount : 0),
+            status: inv?.status || 'NONE'
+          }
+        };
+      });
+
+      return { reports: reportsWithPayment, total, page, limit };
     } catch (error) {
       console.error('[LabReportsService.findAll] Error:', error.message);
       throw error;
     }
   }
 
-  async findById(id: string) {
+  async findById(id: string): Promise<any> {
     const report = await this.reportModel.findById(id)
       .populate('clientId', 'name email mobile age gender address')
       .populate('testId', 'name code category sampleType parameters')
-      .populate('testOrderId', 'orderNumber sampleCollectedAt')
+      .populate('testOrderId', 'orderNumber sampleCollectedAt netAmount')
       .populate('branchId', 'name address phone email labName labLicense')
       .populate('enteredBy', 'name')
       .populate('verifiedBy', 'name')
@@ -84,7 +118,18 @@ export class LabReportsService {
 
     if (!report) throw new NotFoundException('Lab report not found');
     
-    return report;
+    // Attach payment status
+    const inv = await this.invoiceModel.findOne({ testOrderId: report.testOrderId?._id || report.testOrderId }).lean();
+    const reportWithPayment = {
+      ...report,
+      payment: {
+        paidAmount: inv?.paidAmount || 0,
+        balance: inv ? (inv.balance ?? inv.total) : (typeof report.testOrderId === 'object' && report.testOrderId !== null && 'netAmount' in report.testOrderId ? (report.testOrderId as any).netAmount : 0),
+        status: inv?.status || 'NONE'
+      }
+    };
+
+    return reportWithPayment;
   }
 
   async updateResults(id: string, results: any[], userId: string, htmlContent?: string) {
@@ -92,6 +137,12 @@ export class LabReportsService {
     if (!report) throw new NotFoundException('Lab report not found');
     if (report.status === ReportStatus.VERIFIED) {
       throw new BadRequestException('Cannot modify a verified report');
+    }
+
+    // Payment Guard: Partial payment required to enter results
+    const invoice = await this.invoiceModel.findOne({ testOrderId: report.testOrderId }).lean();
+    if (!invoice || (invoice.paidAmount || 0) <= 0) {
+      throw new BadRequestException('At least partial payment is required to enter test results');
     }
 
     if (results && Array.isArray(results)) {
@@ -140,6 +191,12 @@ export class LabReportsService {
     // This resolves issues where status updates might lag behind data entry.
     if (!hasContent && report.status === ReportStatus.PENDING) {
       throw new BadRequestException('Report must have results entered before verification');
+    }
+
+    // Payment Guard: Full payment required to verify/generate PDF
+    const invoice = await this.invoiceModel.findOne({ testOrderId: report.testOrderId }).lean();
+    if (!invoice || (invoice.balance || 0) > 0) {
+      throw new BadRequestException('Full payment is required to verify the report and generate PDF');
     }
 
     // Generate QR code

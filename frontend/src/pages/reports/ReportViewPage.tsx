@@ -40,7 +40,7 @@ export default function ReportViewPage() {
     </div>
   );
 
-  const patient = report.clientId as any;
+  const contactPerson = report.clientId as any;
   const test = report.testId as any;
   const branch = report.branchId as any;
   const order = report.testOrderId as any;
@@ -72,12 +72,12 @@ export default function ReportViewPage() {
             )}
           </div>
 
-          {/* Patient Info */}
+          {/* Contact Person Info */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-surface-800/30 p-4 rounded-xl mb-6">
-            <div><span className="text-xs text-primary-400 font-medium">Patient</span><p className="text-sm text-white font-semibold">{patient?.name}</p></div>
+            <div><span className="text-xs text-primary-400 font-medium">Contact Person</span><p className="text-sm text-white font-semibold">{contactPerson?.name}</p></div>
             <div><span className="text-xs text-primary-400 font-medium">Report #</span><p className="text-sm text-white">{report.reportNumber}</p></div>
-            <div><span className="text-xs text-primary-400 font-medium">Age / Gender</span><p className="text-sm text-white">{patient?.age || '—'} / {patient?.gender || '—'}</p></div>
-            <div><span className="text-xs text-primary-400 font-medium">Mobile</span><p className="text-sm text-white">{patient?.mobile}</p></div>
+            <div><span className="text-xs text-primary-400 font-medium">Age / Gender</span><p className="text-sm text-white">{contactPerson?.age || '—'} / {contactPerson?.gender || '—'}</p></div>
+            <div><span className="text-xs text-primary-400 font-medium">Mobile</span><p className="text-sm text-white">{contactPerson?.mobile}</p></div>
             <div><span className="text-xs text-primary-400 font-medium">Order #</span><p className="text-sm text-white">{order?.orderNumber || '—'}</p></div>
             <div><span className="text-xs text-primary-400 font-medium">Date</span><p className="text-sm text-white">{new Date(report.createdAt).toLocaleDateString()}</p></div>
           </div>

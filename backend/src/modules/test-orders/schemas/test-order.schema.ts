@@ -40,6 +40,30 @@ export class TestOrder {
   @Prop()
   notes: string;
 
+  @Prop()
+  clientName: string;
+
+  @Prop()
+  clientGst: string;
+
+  @Prop()
+  quotationNumber: string;
+
+  @Prop()
+  address: string;
+
+  @Prop({ default: 'NORMAL' })
+  serviceType: string;
+
+  @Prop()
+  contactPersonName: string;
+
+  @Prop()
+  email: string;
+
+  @Prop()
+  phone: string;
+
   @Prop({ default: 0 })
   totalAmount: number;
 
@@ -51,3 +75,10 @@ export class TestOrder {
 }
 
 export const TestOrderSchema = SchemaFactory.createForClass(TestOrder);
+
+// Performance Indexes
+TestOrderSchema.index({ orderNumber: 1 }, { unique: true });
+TestOrderSchema.index({ branchId: 1, status: 1 });
+TestOrderSchema.index({ clientId: 1, createdAt: -1 });
+TestOrderSchema.index({ status: 1, createdAt: -1 });
+TestOrderSchema.index({ clientName: 'text', orderNumber: 'text' });

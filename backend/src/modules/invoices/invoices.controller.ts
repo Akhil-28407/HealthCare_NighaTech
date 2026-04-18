@@ -65,4 +65,11 @@ export class InvoicesController {
   markPaid(@Param('id') id: string) { 
     return this.service.markPaid(id); 
   }
+
+  @Post(':id/record-payment')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.LAB, Role.LAB_EMP)
+  @ApiOperation({ summary: 'Record a partial payment' })
+  recordPayment(@Param('id') id: string, @Body('amount') amount: number) {
+    return this.service.recordPayment(id, amount);
+  }
 }

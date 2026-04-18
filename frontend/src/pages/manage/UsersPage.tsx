@@ -20,7 +20,11 @@ export default function UsersPage() {
     role: currentUser?.role === Role.LAB ? Role.LAB_EMP : Role.EMPLOYEE 
   });
 
-  const { data, isLoading } = useQuery({ queryKey: ['users'], queryFn: () => usersApi.getAll() });
+  const { data, isLoading } = useQuery({ 
+    queryKey: ['users'], 
+    queryFn: () => usersApi.getAll(),
+    enabled: !!currentUser
+  });
 
   const createMutation = useMutation({
     mutationFn: (d: any) => usersApi.create(d),

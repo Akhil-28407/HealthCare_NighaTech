@@ -62,6 +62,12 @@ export class Invoice {
   @Prop({ type: String, enum: InvoiceStatus, default: InvoiceStatus.DRAFT })
   status: InvoiceStatus;
 
+  @Prop({ default: 0 })
+  paidAmount: number;
+
+  @Prop({ default: 0 })
+  balance: number;
+
   @Prop()
   paidAt: Date;
 
@@ -76,3 +82,10 @@ export class Invoice {
 }
 
 export const InvoiceSchema = SchemaFactory.createForClass(Invoice);
+
+// Performance Indexes
+InvoiceSchema.index({ invoiceNumber: 1 }, { unique: true });
+InvoiceSchema.index({ branchId: 1, status: 1 });
+InvoiceSchema.index({ clientId: 1, createdAt: -1 });
+InvoiceSchema.index({ status: 1, createdAt: -1 });
+InvoiceSchema.index({ testOrderId: 1 });

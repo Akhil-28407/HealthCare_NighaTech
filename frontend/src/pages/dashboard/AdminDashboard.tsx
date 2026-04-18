@@ -52,7 +52,7 @@ export default function SuperAdminDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
         <StatCard icon={FiUsers} label="Total Users" value={usersTotal} color="bg-gradient-to-br from-blue-500 to-blue-600" link={`${basePath}/users`} />
         <StatCard icon={FiMapPin} label="Branches" value={branchesTotal} color="bg-gradient-to-br from-purple-500 to-purple-600" link={`${basePath}/branches`} />
-        <StatCard icon={FiUserCheck} label="Clients" value={clientsTotal} color="bg-gradient-to-br from-green-500 to-green-600" link={`${basePath}/clients`} />
+        <StatCard icon={FiUserCheck} label="Contact Persons" value={clientsTotal} color="bg-gradient-to-br from-green-500 to-green-600" link={`${basePath}/clients`} />
         <StatCard icon={FiFileText} label="Test Orders" value={ordersTotal} color="bg-gradient-to-br from-orange-500 to-orange-600" link={`${basePath}/orders`} />
         <StatCard icon={FiActivity} label="Lab Reports" value={reportsTotal} color="bg-gradient-to-br from-red-500 to-red-600" link={`${basePath}/reports`} />
         <StatCard icon={FiDollarSign} label="Invoices" value={invoicesTotal} color="bg-gradient-to-br from-primary-500 to-primary-600" link={`${basePath}/invoices`} />

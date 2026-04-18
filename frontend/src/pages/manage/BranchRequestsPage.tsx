@@ -2,14 +2,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { branchesApi } from '../../api';
 import toast from 'react-hot-toast';
 import { FiCheck, FiX, FiClock, FiInfo, FiActivity } from 'react-icons/fi';
+import { useAuthStore } from '../../stores/auth.store';
 // Use native Date formatting
 
 export default function BranchRequestsPage() {
   const queryClient = useQueryClient();
   
+  const { user: currentUser } = useAuthStore();
   const { data, isLoading } = useQuery({ 
     queryKey: ['branch-update-requests'], 
-    queryFn: () => branchesApi.getUpdateRequests() 
+    queryFn: () => branchesApi.getUpdateRequests(),
+    enabled: !!currentUser
   });
 
   const processMutation = useMutation({

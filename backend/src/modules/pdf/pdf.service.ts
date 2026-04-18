@@ -189,6 +189,8 @@ export class PdfService {
     {{#if tax}}<div>Tax: ₹{{tax}}</div>{{/if}}
     {{#if discount}}<div>Discount: -₹{{discount}}</div>{{/if}}
     <div class="grand-total">Total: ₹{{total}}</div>
+    <div style="margin-top: 10px; color: #16a34a;">Paid Amount: ₹{{paidAmount}}</div>
+    <div style="font-weight: 700; color: #dc2626;">Remaining Balance: ₹{{balance}}</div>
   </div>
   <div class="footer">
     <p>Thank you for choosing our services.</p>
@@ -252,6 +254,8 @@ export class PdfService {
       tax: invoice.tax,
       discount: invoice.discount,
       total: invoice.total,
+      paidAmount: invoice.paidAmount || 0,
+      balance: invoice.balance ?? invoice.total,
       generatedAt: new Date().toLocaleString(),
     };
 
