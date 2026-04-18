@@ -7,11 +7,13 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-utils': ['axios', 'zustand', 'zod', 'react-hot-toast'],
-          'vendor-editor': ['@monaco-editor/react'],
-          'vendor-icons': ['react-icons'],
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react')) return 'vendor-react';
+            if (id.includes('monaco-editor')) return 'vendor-editor';
+            if (id.includes('react-icons')) return 'vendor-icons';
+            return 'vendor-utils';
+          }
         },
       },
     },
