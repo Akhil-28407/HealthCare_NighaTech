@@ -72,7 +72,7 @@ export class LabReportsService {
         this.reportModel.find(filter)
           .populate('clientId', 'name mobile')
           .populate('testId', 'name category')
-          .populate('testOrderId', 'orderNumber netAmount')
+          .populate('testOrderId', 'orderNumber netAmount quotationNumber')
           .populate('branchId', 'name')
           .populate('enteredBy', 'name')
           .populate('verifiedBy', 'name')
