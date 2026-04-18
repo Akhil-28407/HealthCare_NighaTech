@@ -83,20 +83,30 @@ export class LabReportsService {
         this.reportModel.countDocuments(filter),
       ]);
 
-      // Optimization: Fetch all related invoices at once and use a Map for O(1) lookup
-      const getOrderId = (order: any) => {
+      // Extract raw ObjectIds from populated testOrderId objects for DB queries
+      const getOrderId = (order: any): string | null => {
         if (!order) return null;
-        return (order._id || order).toString();
+        if (typeof order === 'object' && order._id) return order._id.toString();
+        return order.toString();
       };
 
-      const orderIds = reports.map(r => r.testOrderId).filter(Boolean);
+      // CRITICAL: Extract raw _id values, NOT the full populated objects.
+      // MongoDB cannot match an ObjectId field against a plain JS object.
+      const rawOrderIds = reports
+        .map(r => {
+          if (!r.testOrderId) return null;
+          if (typeof r.testOrderId === 'object' && r.testOrderId._id) return r.testOrderId._id;
+          return r.testOrderId;
+        })
+        .filter(Boolean);
+
       // Fallback: Also look for invoices by quotationNumber for orders that came from quotations
       const quotationNumbers = reports
         .map(r => r.testOrderId && typeof r.testOrderId === 'object' ? (r.testOrderId as any).quotationNumber : null)
         .filter(Boolean);
 
       const [invoicesByOrder, invoicesByQuo] = await Promise.all([
-        this.invoiceModel.find({ testOrderId: { $in: orderIds } }).lean(),
+        rawOrderIds.length > 0 ? this.invoiceModel.find({ testOrderId: { $in: rawOrderIds } }).lean() : Promise.resolve([]),
         quotationNumbers.length > 0 ? this.invoiceModel.find({ quotationNumber: { $in: quotationNumbers } }).lean() : Promise.resolve([])
       ]);
 
