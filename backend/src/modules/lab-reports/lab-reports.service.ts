@@ -83,12 +83,15 @@ export class LabReportsService {
         this.reportModel.countDocuments(filter),
       ]);
 
-      // Attach payment status to each report
+      // Optimization: Fetch all related invoices at once and use a Map for O(1) lookup
       const orderIds = reports.map(r => r.testOrderId?._id || r.testOrderId);
       const invoices = await this.invoiceModel.find({ testOrderId: { $in: orderIds } }).lean();
+      const invoiceMap = new Map(invoices.map(inv => [inv.testOrderId?.toString(), inv]));
       
       const reportsWithPayment = reports.map(r => {
-        const inv = invoices.find(i => i.testOrderId?.toString() === (r.testOrderId?._id || r.testOrderId)?.toString());
+        const orderIdStr = (r.testOrderId?._id || r.testOrderId)?.toString();
+        const inv: any = invoiceMap.get(orderIdStr);
+        
         return {
           ...r,
           payment: {

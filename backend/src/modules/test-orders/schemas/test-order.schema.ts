@@ -78,6 +78,7 @@ export const TestOrderSchema = SchemaFactory.createForClass(TestOrder);
 
 // Performance Indexes
 TestOrderSchema.index({ orderNumber: 1 }, { unique: true });
+TestOrderSchema.index({ branchId: 1, createdAt: -1 });
 TestOrderSchema.index({ branchId: 1, status: 1 });
 TestOrderSchema.index({ clientId: 1, createdAt: -1 });
 TestOrderSchema.index({ status: 1, createdAt: -1 });

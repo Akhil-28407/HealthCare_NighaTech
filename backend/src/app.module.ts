@@ -36,8 +36,10 @@ import { UploadModule } from './modules/upload/upload.module';
         serverSelectionTimeoutMS: 5000,
         socketTimeoutMS: 45000,
         connectTimeoutMS: 5000,
+        heartbeatFrequencyMS: 10000, // Frequent heartbeats keep connection alive in serverless
         autoIndex: process.env.NODE_ENV !== 'production',
         maxPoolSize: 10,
+        minPoolSize: 1, // Maintain at least one connection
       }),
     }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),

@@ -85,6 +85,7 @@ export const InvoiceSchema = SchemaFactory.createForClass(Invoice);
 
 // Performance Indexes
 InvoiceSchema.index({ invoiceNumber: 1 }, { unique: true });
+InvoiceSchema.index({ branchId: 1, createdAt: -1 });
 InvoiceSchema.index({ branchId: 1, status: 1 });
 InvoiceSchema.index({ clientId: 1, createdAt: -1 });
 InvoiceSchema.index({ status: 1, createdAt: -1 });
