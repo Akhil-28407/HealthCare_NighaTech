@@ -84,19 +84,24 @@ export class LabReportsService {
       ]);
 
       // Optimization: Fetch all related invoices at once and use a Map for O(1) lookup
-      const orderIds = reports.map(r => r.testOrderId?._id || r.testOrderId);
+      const getOrderId = (order: any) => {
+        if (!order) return null;
+        return (order._id || order).toString();
+      };
+
+      const orderIds = reports.map(r => r.testOrderId).filter(Boolean);
       const invoices = await this.invoiceModel.find({ testOrderId: { $in: orderIds } }).lean();
       const invoiceMap = new Map(invoices.map(inv => [inv.testOrderId?.toString(), inv]));
       
       const reportsWithPayment = reports.map(r => {
-        const orderIdStr = (r.testOrderId?._id || r.testOrderId)?.toString();
+        const orderIdStr = getOrderId(r.testOrderId);
         const inv: any = invoiceMap.get(orderIdStr);
         
         return {
           ...r,
           payment: {
             paidAmount: inv?.paidAmount || 0,
-            balance: inv ? (inv.balance ?? inv.total) : (typeof r.testOrderId === 'object' && r.testOrderId !== null && 'netAmount' in r.testOrderId ? (r.testOrderId as any).netAmount : 0),
+            balance: inv ? (inv.balance ?? inv.total) : (r.testOrderId && typeof r.testOrderId === 'object' && 'netAmount' in r.testOrderId ? (r.testOrderId as any).netAmount : 0),
             status: inv?.status || 'NONE'
           }
         };
