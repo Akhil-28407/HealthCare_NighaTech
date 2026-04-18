@@ -44,6 +44,9 @@ export class Invoice {
   @Prop({ type: Types.ObjectId, ref: 'Quotation' })
   quotationId: Types.ObjectId;
 
+  @Prop()
+  quotationNumber: string;
+
   @Prop({ type: [InvoiceItem], default: [] })
   items: InvoiceItem[];
 

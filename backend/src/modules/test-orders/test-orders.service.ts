@@ -102,21 +102,39 @@ export class TestOrdersService {
       }
     }
 
-    // Automatically create an invoice for the test order
+    // Link to existing quotation invoice OR create a new one
     try {
-      await this.invoicesService.create({
-        clientId: order.clientId,
-        testOrderId: order._id,
-        branchId: order.branchId,
-        items: testsData.map(test => ({
-          name: test.name,
-          quantity: 1,
-          unitPrice: test.price || 0,
-          description: test.category || 'Clinical Test'
-        })),
-        discount: order.discount || 0,
-        notes: `Invoice generated for Order ${order.orderNumber}`
-      });
+      let existingInvoice = null;
+      if (order.quotationNumber) {
+        // Look for an invoice created from this quotation
+        existingInvoice = await this.orderModel.db.collection('invoices').findOne({ 
+          quotationNumber: order.quotationNumber,
+          testOrderId: { $exists: false } // Only take it if not already linked
+        });
+      }
+
+      if (existingInvoice) {
+        // Link the existing paid/unpaid invoice to this order
+        await this.orderModel.db.collection('invoices').updateOne(
+          { _id: existingInvoice._id },
+          { $set: { testOrderId: order._id } }
+        );
+      } else {
+        // Only create a new one if no quotation invoice exists
+        await this.invoicesService.create({
+          clientId: order.clientId,
+          testOrderId: order._id,
+          branchId: order.branchId,
+          items: testsData.map(test => ({
+            name: test.name,
+            quantity: 1,
+            unitPrice: test.price || 0,
+            description: test.category || 'Clinical Test'
+          })),
+          discount: order.discount || 0,
+          notes: `Invoice generated for Order ${order.orderNumber}`
+        });
+      }
     } catch (invError) {
       console.error(`[TestOrders] Failed to auto-create invoice for order ${order.orderNumber}:`, invError.message);
       // We don't throw here to avoid failing the order creation itself

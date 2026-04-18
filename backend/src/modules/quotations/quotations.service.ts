@@ -94,6 +94,7 @@ export class QuotationsService {
       clientId: quotation.clientId,
       branchId: quotation.branchId,
       quotationId: quotation._id,
+      quotationNumber: quotation.quotationNumber,
       items: quotation.items,
       subtotal: quotation.subtotal,
       tax: quotation.tax,

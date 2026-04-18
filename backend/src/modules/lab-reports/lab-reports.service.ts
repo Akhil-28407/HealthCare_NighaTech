@@ -90,12 +90,31 @@ export class LabReportsService {
       };
 
       const orderIds = reports.map(r => r.testOrderId).filter(Boolean);
-      const invoices = await this.invoiceModel.find({ testOrderId: { $in: orderIds } }).lean();
-      const invoiceMap = new Map(invoices.map(inv => [inv.testOrderId?.toString(), inv]));
+      // Fallback: Also look for invoices by quotationNumber for orders that came from quotations
+      const quotationNumbers = reports
+        .map(r => r.testOrderId && typeof r.testOrderId === 'object' ? (r.testOrderId as any).quotationNumber : null)
+        .filter(Boolean);
+
+      const [invoicesByOrder, invoicesByQuo] = await Promise.all([
+        this.invoiceModel.find({ testOrderId: { $in: orderIds } }).lean(),
+        quotationNumbers.length > 0 ? this.invoiceModel.find({ quotationNumber: { $in: quotationNumbers } }).lean() : Promise.resolve([])
+      ]);
+
+      const allInvoices = [...invoicesByOrder, ...invoicesByQuo];
+      const invoiceMap = new Map();
+      
+      // Preferred link is testOrderId
+      allInvoices.forEach(inv => {
+        if (inv.testOrderId) invoiceMap.set(inv.testOrderId.toString(), inv);
+        if (inv.quotationNumber) invoiceMap.set(inv.quotationNumber, inv);
+      });
       
       const reportsWithPayment = reports.map(r => {
         const orderIdStr = getOrderId(r.testOrderId);
-        const inv: any = invoiceMap.get(orderIdStr);
+        const quoNum = r.testOrderId && typeof r.testOrderId === 'object' ? (r.testOrderId as any).quotationNumber : null;
+        
+        // Priority: Match by testOrderId, then by quotationNumber
+        const inv: any = invoiceMap.get(orderIdStr) || (quoNum ? invoiceMap.get(quoNum) : null);
         
         return {
           ...r,
